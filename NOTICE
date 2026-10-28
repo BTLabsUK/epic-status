@@ -1,0 +1,8 @@
+epic-status
+Copyright 2026 BT Labs
+
+Licensed under the MIT License. See LICENSE.
+
+Bundled third-party material keeps its own licence: the country flags in
+src/epic_status/static/flags/ (see the LICENSE there) and the Montserrat font in
+src/epic_status/static/fonts/ (see the README there).
