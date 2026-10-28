@@ -1,7 +1,5 @@
 # Design
 
-<!-- impeccable:design-schema 1 -->
-
 The visual system for status.btlabs.uk. Product truth lives in `PRODUCT.md`; this file is
 only about how the thing looks and why.
 

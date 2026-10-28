@@ -7,8 +7,8 @@ StartLimitIntervalSec=0
 
 [Service]
 Type=simple
-User=bt
-Group=bt
+User=epic-status
+Group=epic-status
 SyslogIdentifier=epic-status-tor
 ExecStart=/usr/bin/tor -f /opt/epic-status-tor/torrc
 Restart=always

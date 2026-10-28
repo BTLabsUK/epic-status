@@ -31,8 +31,8 @@ StartLimitBurst=10
 
 [Service]
 Type=simple
-User=bt
-Group=bt
+User=epic-status
+Group=epic-status
 WorkingDirectory=/opt/epic-status
 
 Environment=EPIC_STATUS_BIND=127.0.0.1

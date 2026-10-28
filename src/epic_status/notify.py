@@ -1,6 +1,6 @@
 """Tell the operator, by Telegram DM, that a submission is waiting for review.
 
-The feedback bot on the bot host owns the Telegram token. This service holds only a scoped
+The feedback bot owns the Telegram token. This service holds only a scoped
 token that is accepted on one route there (`POST /status/notify`) and can do one
 thing: make the bot send the operator a one-line private message. The token lives in
 an `EnvironmentFile` under /etc (mode 600), never in git.
