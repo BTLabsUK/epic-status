@@ -313,7 +313,7 @@ def test_footer_links_to_the_public_repository(snapshot: Snapshot) -> None:
     It now comes from `source_url`, and the Run-your-own link goes to the README section
     that explains how."""
     html = render_board(snapshot=snapshot, settings=SETTINGS)
-    assert SETTINGS.source_url == "https://gitlab.com/bt-labs-group/epic-status"
+    assert SETTINGS.source_url == "https://gitlab.com/epic-cash-bt/epic-status"
     assert f'<a href="{SETTINGS.source_url}">Source</a>' in html
     assert f'<a href="{SETTINGS.source_url}#run-from-source">Run your own</a>' in html
     assert "blacktyger" not in html

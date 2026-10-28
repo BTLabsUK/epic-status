@@ -30,7 +30,7 @@ Requirements: Linux, [uv](https://docs.astral.sh/uv/) and Python 3.12 (see `.pyt
 and outbound HTTPS/WSS to the hosts you monitor.
 
 ```sh
-git clone https://gitlab.com/bt-labs-group/epic-status.git && cd epic-status
+git clone https://gitlab.com/epic-cash-bt/epic-status.git && cd epic-status
 uv sync
 cp .env.example .env
 uv run epic-status serve
