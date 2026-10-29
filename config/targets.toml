@@ -131,9 +131,9 @@ notes = "Used by Stack Wallet mobile"
 [[epicbox]]
 slug = "flooepicbox.btlabs.uk"
 display_host = "flooepicbox.btlabs.uk"
-chain = "floonet"
 endpoint = "wss://flooepicbox.btlabs.uk:443/"
 operator = "btlabs"
+label = "BT Labs Epicbox"
 ours = true
 country = "GB"
 # Challenge frame in 50 ms, protocol 3.0.0.
@@ -145,7 +145,13 @@ country = "GB"
 # parse an address on a hyphenated relay even though the socket answers perfectly.
 # `epicbox.btlabs.uk` resolves and serves TLS but refuses the websocket upgrade
 # with HTTP 400, so it is a certificate SAN rather than a relay endpoint.
-notes = "Floonet relay"
+#
+# 2026-10-29: listed with the mainnet relays, not under floonet. The relay is
+# network-agnostic (an Epicbox queue is keyed by public key, whatever the chain);
+# "floo" is only part of the name. epicbox.btlabs.uk cannot replace the name yet:
+# the relay stores slates only for its own epicbox_domain and forwards any other
+# domain, so that needs a relay change first. The slug stays so history is kept.
+notes = "BT Labs relay, for mainnet and floonet wallets"
 
 # Three relays were listed here and have been removed: epicbox.fastepic.eu and
 # epicbox.btlabs.tech, neither of which resolves, and epicbox.51pool.online,
