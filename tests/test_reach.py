@@ -55,7 +55,7 @@ async def test_ip_is_the_proxys_peer(tmp_path: Path) -> None:
     assert response.status_code == 200
     assert response.json() == {"ip": PUBLIC}
     assert response.headers["cache-control"] == "no-store"
-    assert response.headers["access-control-allow-origin"] == "*"
+    assert "access-control-allow-origin" not in response.headers
 
 
 async def test_ip_ignores_forwarded_for(tmp_path: Path) -> None:
@@ -235,3 +235,53 @@ async def test_probe_epic_wallet_foreign_api(chunked: bool) -> None:
     assert seen[0].startswith(b"POST /v2/foreign HTTP/1.1\r\n")
     assert b'"method":"check_version"' in seen[0]
 
+
+
+# ------------------------------------------------------------- browsers steered by other sites
+
+
+@pytest.mark.parametrize("path", ["/api/v1/ip", "/api/v1/reach?port=3415"])
+@pytest.mark.parametrize(
+    "extra",
+    [
+        {"sec-fetch-site": "cross-site"},
+        {"sec-fetch-site": "same-site"},
+        {"origin": "https://evil.example"},
+    ],
+)
+async def test_selftest_refuses_cross_site(
+    tmp_path: Path, path: str, extra: dict[str, str], fake_probe: list[Any]
+) -> None:
+    async with client_for(app_for(tmp_path)) as client:
+        response = await client.get(path, headers={"x-real-ip": PUBLIC, **extra})
+    assert response.status_code == 403
+    assert "access-control-allow-origin" not in response.headers
+    assert fake_probe == []
+
+
+@pytest.mark.parametrize("path", ["/api/v1/ip", "/api/v1/reach?port=3415"])
+async def test_selftest_allows_plain_and_same_origin_without_cors(
+    tmp_path: Path, path: str, fake_probe: list[Any]
+) -> None:
+    async with client_for(app_for(tmp_path)) as client:
+        plain = await client.get(path, headers={"x-real-ip": PUBLIC})
+        same = await client.get(path, headers={"x-real-ip": PUBLIC, "sec-fetch-site": "same-origin"})
+    assert plain.status_code == 200 and same.status_code == 200
+    assert "access-control-allow-origin" not in plain.headers
+
+
+@pytest.mark.parametrize(
+    "body", [{"id": 1, "result": None}, {"id": 1, "result": [1]}, [1, 2]]
+)
+async def test_probe_odd_json_is_open_without_wallet(body: Any) -> None:
+    async def handler(reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
+        await reader.read(4096)
+        raw = json.dumps(body).encode()
+        writer.write(f"HTTP/1.1 200 OK\r\ncontent-length: {len(raw)}\r\n\r\n".encode() + raw)
+        await writer.drain()
+        writer.close()
+
+    server, port = await _serve(handler)
+    async with server:
+        is_open, api, _ = await rc.probe("127.0.0.1", port, timeout=2.0)
+    assert (is_open, api) == (True, False)

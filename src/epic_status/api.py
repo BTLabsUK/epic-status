@@ -829,20 +829,27 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             return await _quick_check_route(service, request)
 
     # Wallet connectivity self-test (docs/wallet-connectivity.md). Not in the public schema,
-    # like the quick check: `reach` makes this server connect somewhere. Plain JSON with CORS,
-    # as wallets read it outside a browser and a page reading it learns only its own address.
+    # like the quick check: `reach` makes this server connect somewhere. Plain JSON without
+    # CORS: wallets read it outside a browser, and a page that could read `reach` would be
+    # port-scanning its visitor's own address through us. Browsers steered by another site are
+    # refused outright (`_selftest_guard`); a client that sends no browser headers is left to
+    # the rate limits.
     @app.get("/api/v1/ip", include_in_schema=False)
     async def my_ip(request: Request) -> Response:
         """The address this request came from, as the internet sees it."""
+        if (refused := _selftest_guard(request)) is not None:
+            return refused
         try:
             ip = public_address(_peer(request), onion=onion_request.get())
         except ReachError as exc:
-            return json_response({"error": exc.message}, exc.status)
-        return json_response({"ip": ip})
+            return _selftest_json({"error": exc.message}, exc.status)
+        return _selftest_json({"ip": ip})
 
     @app.get("/api/v1/reach", include_in_schema=False)
     async def reach_route(request: Request) -> Response:
         """Whether `port` on the requester's own address answers from outside."""
+        if (refused := _selftest_guard(request)) is not None:
+            return refused
         try:
             ip = public_address(_peer(request), onion=onion_request.get())
             port = parse_port(request.query_params.get("port"))
@@ -850,11 +857,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 ip, port, limiter=service.reach_limiter, local=service.quickcheck.local
             )
         except ReachError as exc:
-            response = json_response({"error": exc.message}, exc.status)
+            response = _selftest_json({"error": exc.message}, exc.status)
             if exc.retry_after:
                 response.headers["retry-after"] = str(exc.retry_after)
             return response
-        return json_response(result)
+        return _selftest_json(result)
 
     @app.head("/api/v1/health", include_in_schema=False)
     @app.get(
@@ -1065,6 +1072,17 @@ def _same_origin_post(request: Request) -> bool:
         return origin is None
     host = request.headers.get("host") or ""
     return origin.split("://", 1)[-1].rstrip("/") == host
+
+
+def _selftest_json(payload: dict[str, Any], status_code: int = 200) -> Response:
+    return JSONResponse(payload, status_code=status_code, headers={"cache-control": "no-store"})
+
+
+def _selftest_guard(request: Request) -> Response | None:
+    """A 403 when a browser is being steered by another site into /ip or /reach."""
+    if _same_origin_post(request):
+        return None
+    return _selftest_json({"error": "cross-site requests are refused"}, 403)
 
 
 async def _quick_check_route(service: Service, request: Request) -> Response:

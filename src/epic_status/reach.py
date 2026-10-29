@@ -189,7 +189,8 @@ async def _check_version(
     if b"transfer-encoding: chunked" in head.lower():
         body = _unchunk(body)
     data = json.loads(body)
-    ok = data.get("result", {}).get("Ok") if isinstance(data, dict) else None
+    result = data.get("result") if isinstance(data, dict) else None
+    ok = result.get("Ok") if isinstance(result, dict) else None
     version = ok.get("foreign_api_version") if isinstance(ok, dict) else None
     return str(version) if isinstance(version, int) and not isinstance(version, bool) else None
 
