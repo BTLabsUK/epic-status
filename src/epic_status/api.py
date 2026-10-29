@@ -45,6 +45,7 @@ from .models import Chain, Event, Kind, Severity, Snapshot, State, Target, Targe
 from .net import build_client
 from .poller import Poller
 from .quickcheck import QuickChecker, QuickCheckResult, run_check
+from .reach import ReachError, ReachLimiter, parse_port, public_address, reach
 from .render import (
     probe_url,
     render_api,
@@ -171,6 +172,9 @@ class Service:
         # value whose only job is rate limiting.
         self.submitter_salt = secrets.token_hex(16)
         self.quickcheck = QuickChecker(settings)
+        # Its own allowance and salt: a wallet checking its port does not use up the
+        # visitor's quick checks, nor the other way round.
+        self.reach_limiter = ReachLimiter(secrets.token_hex(16))
         # Read at boot like the target registry: a malformed icons.toml stops the service
         # rather than publishing with limits nobody chose.
         self.icon_settings = server_icons.load_icon_settings(settings.icons_file)
@@ -824,6 +828,34 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             """
             return await _quick_check_route(service, request)
 
+    # Wallet connectivity self-test (docs/wallet-connectivity.md). Not in the public schema,
+    # like the quick check: `reach` makes this server connect somewhere. Plain JSON with CORS,
+    # as wallets read it outside a browser and a page reading it learns only its own address.
+    @app.get("/api/v1/ip", include_in_schema=False)
+    async def my_ip(request: Request) -> Response:
+        """The address this request came from, as the internet sees it."""
+        try:
+            ip = public_address(_peer(request), onion=onion_request.get())
+        except ReachError as exc:
+            return json_response({"error": exc.message}, exc.status)
+        return json_response({"ip": ip})
+
+    @app.get("/api/v1/reach", include_in_schema=False)
+    async def reach_route(request: Request) -> Response:
+        """Whether `port` on the requester's own address answers from outside."""
+        try:
+            ip = public_address(_peer(request), onion=onion_request.get())
+            port = parse_port(request.query_params.get("port"))
+            result = await reach(
+                ip, port, limiter=service.reach_limiter, local=service.quickcheck.local
+            )
+        except ReachError as exc:
+            response = json_response({"error": exc.message}, exc.status)
+            if exc.retry_after:
+                response.headers["retry-after"] = str(exc.retry_after)
+            return response
+        return json_response(result)
+
     @app.head("/api/v1/health", include_in_schema=False)
     @app.get(
         "/api/v1/health",
@@ -977,6 +1009,19 @@ async def _run_validator(service: Service) -> None:
 
 
 _CHECK_BODY_LIMIT = 4096
+
+
+def _peer(request: Request) -> str:
+    """Who connected to nginx: `x-real-ip`, which the vhost sets to `$remote_addr` over
+    anything the client sent, else the socket peer (loopback, so refused downstream).
+
+    Not `client_address`: that falls back to the last `x-forwarded-for` entry, which is good
+    enough for a rate-limit key but not for the address `reach` connects to.
+    """
+    real = request.headers.get("x-real-ip", "").strip()
+    if real:
+        return real
+    return request.client.host if request.client else ""
 
 
 def _check_response(payload: dict[str, Any], status_code: int) -> Response:

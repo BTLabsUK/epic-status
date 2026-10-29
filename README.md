@@ -17,7 +17,9 @@
 epic-status is the dashboard behind <https://status.btlabs.uk>. It checks public Epic Cash nodes,
 Epicbox relays and mining pools on mainnet and floonet, and shows which are up, in sync and on the
 same chain. It also watches BT Labs' own services, and offers a JSON API (`/api/v1/status.json`),
-a quick check for anyone's host and a mirror as a Tor onion service.
+a quick check for anyone's host, a connectivity self-test for wallets
+(`/api/v1/ip`, `/api/v1/reach`, see [docs/wallet-connectivity.md](docs/wallet-connectivity.md))
+and a mirror as a Tor onion service.
 
 ![The status board: chain verdict, tip height, and the public nodes table](docs/screenshot.png)
 
@@ -129,7 +131,7 @@ commands. Back up `data/status.db` and `data/icons/`.
 | `config/` | `targets.toml` (what is monitored) and `icons.toml` (icon limits) |
 | `ops/` | nginx, systemd and Tor files for deployment |
 | `tests/` | The pytest suite |
-| `docs/` | The README screenshot |
+| `docs/` | The README screenshot and [the wallet connectivity API](docs/wallet-connectivity.md) |
 | `PRODUCT.md`, `DESIGN.md` | What the page is for and how it looks |
 
 ## Testing
