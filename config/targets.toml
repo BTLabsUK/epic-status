@@ -129,9 +129,9 @@ country = "FI"
 notes = "Used by Stack Wallet mobile"
 
 [[epicbox]]
-slug = "flooepicbox.btlabs.uk"
-display_host = "flooepicbox.btlabs.uk"
-endpoint = "wss://flooepicbox.btlabs.uk:443/"
+slug = "epicbox.btlabs.uk"
+display_host = "epicbox.btlabs.uk"
+endpoint = "wss://epicbox.btlabs.uk:443/"
 operator = "btlabs"
 label = "BT Labs Epicbox"
 ours = true
@@ -143,14 +143,14 @@ country = "GB"
 # `floo-epicbox.btlabs.uk` is refused by this service's own submit validator,
 # since Epicbox addresses admit only letters, digits and dots — a wallet cannot
 # parse an address on a hyphenated relay even though the socket answers perfectly.
-# `epicbox.btlabs.uk` resolves and serves TLS but refuses the websocket upgrade
-# with HTTP 400, so it is a certificate SAN rather than a relay endpoint.
+# `epicbox.btlabs.uk` resolved and served TLS but refused the websocket upgrade
+# with HTTP 400 until 2026-10-29 (see below); it is now the relay endpoint.
 #
 # 2026-10-29: listed with the mainnet relays, not under floonet. The relay is
-# network-agnostic (an Epicbox queue is keyed by public key, whatever the chain);
-# "floo" is only part of the name. epicbox.btlabs.uk cannot replace the name yet:
-# the relay stores slates only for its own epicbox_domain and forwards any other
-# domain, so that needs a relay change first. The slug stays so history is kept.
+# network-agnostic (an Epicbox queue is keyed by public key, whatever the chain).
+# Same day: the relay's epicbox_domain was switched to epicbox.btlabs.uk, and
+# flooepicbox.btlabs.uk now refuses the websocket. The row (id 29) was renamed in
+# the database as well as here, so it keeps its history from flooepicbox.
 notes = "BT Labs relay, for mainnet and floonet wallets"
 
 # Three relays were listed here and have been removed: epicbox.fastepic.eu and

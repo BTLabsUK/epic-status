@@ -85,8 +85,8 @@ def test_a_seed_is_flagged_as_verified(seeds: list) -> None:
     """
     mine = sorted(t.slug for t in seeds if t.verified)
     assert mine == [
+        "epicbox.btlabs.uk",
         "floo-node.btlabs.uk",
-        "flooepicbox.btlabs.uk",
         "node.btlabs.uk",
     ]
 
