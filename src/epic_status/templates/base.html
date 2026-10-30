@@ -127,6 +127,7 @@
           <a href="/api/v1/status.json">status.json</a>
           <a href="/feed.atom{{ chain_query }}">Incident feed</a>
           <a href="{{ source_url }}">Source</a>
+          {% if mirror_url %}<a href="{{ mirror_url }}">GitHub mirror</a>{% endif %}
           <a href="{{ source_url }}#run-from-source">Run your own</a>
         </nav>
         {% if not onion %}

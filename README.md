@@ -12,6 +12,9 @@
 [Run from source](#run-from-source) · [Deployment](#deployment) · [Security](SECURITY.md) ·
 [Documentation](https://docs.btlabs.uk)
 
+Source: [GitLab](https://gitlab.com/epic-cash-bt/epic-status) · Mirror:
+[GitHub](https://github.com/BTLabsUK/epic-status)
+
 </div>
 
 epic-status is the dashboard behind <https://status.btlabs.uk>. It checks public Epic Cash nodes,
