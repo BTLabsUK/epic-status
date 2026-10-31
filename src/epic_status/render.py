@@ -1274,7 +1274,7 @@ DONATE_ADDRESSES = (
     {
         "label": "Epicbox",
         "note": "Send over Epicbox.",
-        "value": "esWxboBPMgL4RqufRYcGUJ7t6YVWGvyuid6xRM62UkRzSb3jUcNK@epicbox.epiccash.com",
+        "value": "esWxboBPMgL4RqufRYcGUJ7t6YVWGvyuid6xRM62UkRzSb3jUcNK@epicbox.btlabs.uk",
         "qr": "epicbox",
     },
     {
