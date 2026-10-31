@@ -38,6 +38,7 @@ from fastapi.staticfiles import StaticFiles
 
 from . import admin_routes, schemas, server_icons
 from .badges import badge_for
+from .btlabs_public import BtlabsPublic
 from .config import Settings, load_seed_targets
 from .config import settings as get_settings
 from .db import Database
@@ -47,6 +48,7 @@ from .poller import Poller
 from .quickcheck import QuickChecker, QuickCheckResult, run_check
 from .reach import ReachError, ReachLimiter, parse_port, public_address, reach
 from .render import (
+    DONATE_ADDRESSES,
     probe_url,
     render_api,
     render_donate,
@@ -302,6 +304,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     # itself broken to exactly the tools most likely to watch it.
     app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
     app.state.service = service
+    btlabs_public = BtlabsPublic(
+        url=settings.btlabs_public_url,
+        fallback=DONATE_ADDRESSES[0]["value"],
+        cache_path=settings.db.parent / "btlabs-public.json",
+    )
 
     @app.middleware("http")
     async def mark_onion_requests(request: Request, call_next: Any) -> Any:
@@ -544,8 +551,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.api_route("/donate", methods=["GET", "HEAD"], include_in_schema=False)
     async def donate() -> HTMLResponse:
+        address = await btlabs_public.address()
         return HTMLResponse(
-            render_donate(settings=settings),
+            render_donate(
+                settings=settings,
+                epicbox_address=address,
+                epicbox_qr_svg=btlabs_public.qr(address),
+            ),
             headers={"cache-control": "no-store", **security_headers()},
         )
 

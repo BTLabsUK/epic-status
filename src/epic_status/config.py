@@ -92,6 +92,11 @@ class Settings(BaseSettings):
     """Every server-icon setting: accepted types, size limits, output sizes, storage and
     retention, upload rate limits. See `server_icons`."""
 
+    btlabs_public_url: str = "https://gitlab.com/epic-cash-bt/btlabs-epic.github.io/-/raw/main/btlabs.json"
+    """BT Labs' signed public file, source of the Epicbox address on the Donate page. Checked
+    against the keyring shipped in the package; empty means never fetch (the bundled address
+    is used). The last accepted copy is kept next to the database."""
+
     site_name: str = "Epic Cash Status"
     site_url: str = "http://127.0.0.1:13431"
     onion_url: str = ""

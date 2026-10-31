@@ -27,6 +27,9 @@ dependencies = [
     # Server icons: every upload is decoded and re-encoded here, never served as sent.
     # 12.3 rather than 13.0, which is days old; see icon_upload.
     "pillow==12.3.0",
+    # The donate page reads BT Labs' address from a signed file (Ed25519) and draws its QR.
+    "cryptography==50.0.2",
+    "segno==1.6.6",
 ]
 
 [project.optional-dependencies]
@@ -48,7 +51,7 @@ build-backend = "setuptools.build_meta"
 where = ["src"]
 
 [tool.setuptools.package-data]
-epic_status = ["static/*", "static/**/*", "templates/*"]
+epic_status = ["static/*", "static/**/*", "templates/*", "keys/*.json"]
 
 [tool.mypy]
 python_version = "3.12"
