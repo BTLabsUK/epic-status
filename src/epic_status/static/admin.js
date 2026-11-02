@@ -14,7 +14,7 @@
  *
  * The text rule is the one worth defending. Saving on every keystroke writes a row per
  * character; saving only on blur loses work when a tab is closed mid-edit; so both, which is
- * what GitLab's design spec and the autosave literature converge on. 900ms is long enough
+ * what the autosave literature converges on. 900ms is long enough
  * that a two-finger typist is not saving between words and short enough that the save has
  * landed before attention moves.
  *

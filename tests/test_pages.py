@@ -313,10 +313,10 @@ def test_footer_links_to_the_public_repository(snapshot: Snapshot) -> None:
     It now comes from `source_url`, and the Run-your-own link goes to the README section
     that explains how."""
     html = render_board(snapshot=snapshot, settings=SETTINGS)
-    assert SETTINGS.source_url == "https://gitlab.com/epic-cash-bt/epic-status"
+    assert SETTINGS.source_url == "https://github.com/BTLabsUK/epic-status"
     assert f'<a href="{SETTINGS.source_url}">Source</a>' in html
     assert f'<a href="{SETTINGS.source_url}#run-from-source">Run your own</a>' in html
-    assert '<a href="https://github.com/BTLabsUK/epic-status">GitHub mirror</a>' in html
+    assert "GitHub mirror" not in html
     assert "blacktyger" not in html
     api = render_api(settings=SETTINGS)
     assert f'href="{SETTINGS.source_url}#run-from-source"' in api
@@ -358,8 +358,6 @@ def test_source_url_is_configurable(snapshot: Snapshot) -> None:
     fork = Settings(source_url="https://example.org/fork/epic-status")
     html = render_board(snapshot=snapshot, settings=fork)
     assert '<a href="https://example.org/fork/epic-status">Source</a>' in html
-    unmirrored = render_board(snapshot=snapshot, settings=Settings(mirror_url=""))
-    assert "GitHub mirror" not in unmirrored
 
 
 def test_node_status_renders_peers_and_details(snapshot: Snapshot) -> None:

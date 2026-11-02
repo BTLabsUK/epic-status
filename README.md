@@ -12,8 +12,7 @@
 [Run from source](#run-from-source) · [Deployment](#deployment) · [Security](SECURITY.md) ·
 [Documentation](https://docs.btlabs.uk)
 
-Source: [GitLab](https://gitlab.com/epic-cash-bt/epic-status) · Mirror:
-[GitHub](https://github.com/BTLabsUK/epic-status)
+Source: [GitHub](https://github.com/BTLabsUK/epic-status)
 
 </div>
 
@@ -33,7 +32,7 @@ Requirements: Linux, [uv](https://docs.astral.sh/uv/) and Python 3.12 (see `.pyt
 and outbound HTTPS/WSS to the hosts you monitor.
 
 ```sh
-git clone https://gitlab.com/epic-cash-bt/epic-status.git && cd epic-status
+git clone https://github.com/BTLabsUK/epic-status.git && cd epic-status
 uv sync
 cp .env.example .env
 uv run epic-status serve
@@ -144,12 +143,12 @@ uv run pytest -q
 
 ## Security
 
-Report vulnerabilities to **support@btlabs.uk** or as a confidential issue on GitLab, not as a
+Report vulnerabilities to **support@btlabs.uk** not as a
 public issue. See [SECURITY.md](SECURITY.md).
 
 ## Contributing
 
-Merge requests are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md) first; it is short. This
+Pull requests are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md) first; it is short. This
 project follows the [Code of Conduct](CODE_OF_CONDUCT.md).
 
 ## Licence

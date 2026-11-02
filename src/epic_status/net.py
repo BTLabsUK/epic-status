@@ -219,7 +219,7 @@ def build_client(*, timeout: float, verify: bool = True) -> httpx.AsyncClient:
         follow_redirects=False,
         verify=verify,
         limits=httpx.Limits(max_connections=32, max_keepalive_connections=16),
-        headers={"user-agent": "epic-status/0.1 (+https://gitlab.com/epic-cash-bt/epic-status)"},
+        headers={"user-agent": "epic-status/0.1 (+https://github.com/BTLabsUK/epic-status)"},
     )
 
 

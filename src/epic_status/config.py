@@ -98,12 +98,9 @@ class Settings(BaseSettings):
     """This instance's onion address, e.g. `http://abc….onion`. When set, a request that
     arrived over the onion (see `web.onion_request`) gets icon URLs on it rather than on
     `site_url`, so a Tor wallet never has to leave Tor to draw a server's icon."""
-    source_url: str = "https://gitlab.com/epic-cash-bt/epic-status"
+    source_url: str = "https://github.com/BTLabsUK/epic-status"
     """Where the footer's Source and Run-your-own links point. A fork that changes
     the code should point it at its own repository."""
-    mirror_url: str = "https://github.com/BTLabsUK/epic-status"
-    """A read-only copy of the source, linked next to Source in the footer. Empty hides
-    the link."""
     prober_id: str = "local"
     """Which vantage point these measurements come from. Stored on every check so
     a second prober in another region is additive rather than a migration. A

@@ -1,6 +1,6 @@
 # Contributing
 
-Contributions are welcome as merge requests on GitLab.
+Contributions are welcome as pull requests on GitHub.
 
 ## Before you start
 
@@ -9,7 +9,7 @@ Contributions are welcome as merge requests on GitLab.
 
 ## Making a change
 
-- Set up with `uv sync --extra dev`, then run `uv run pytest -q` before you open a merge request. It must pass.
+- Set up with `uv sync --extra dev`, then run `uv run pytest -q` before you open a pull request. It must pass.
 - One logical change per commit, with a plain-sentence message that says what changed and why.
 - Match the surrounding code: its naming, comment density and idiom.
 - Sign off every commit (`git commit -s`). That certifies the

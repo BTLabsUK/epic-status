@@ -408,7 +408,7 @@ async def _fetch(
         verify=True,
         timeout=httpx.Timeout(cfg.fetch_timeout_s),
         transport=transport,
-        headers={"user-agent": "epic-status/0.1 (+https://gitlab.com/epic-cash-bt/epic-status)"},
+        headers={"user-agent": "epic-status/0.1 (+https://github.com/BTLabsUK/epic-status)"},
     ) as client:
         current = url.strip()
         for hop in range(cfg.fetch_max_redirects + 1):
