@@ -122,6 +122,8 @@ Paths in these files (`/opt/epic-status`, `/opt/epic-status-tor`), the user and 
 `server_name` are examples: edit them for your machine. Each file's header has its install
 commands. Back up `data/status.db` and `data/icons/`.
 
+How status.btlabs.uk itself is deployed: [DEPLOY.md](DEPLOY.md).
+
 ## Project structure
 
 | Path | What it holds |
