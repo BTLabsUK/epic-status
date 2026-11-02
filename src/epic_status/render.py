@@ -14,6 +14,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from pathlib import Path
+import base64
 import hashlib
 import re
 from collections.abc import Mapping, Sequence
@@ -1273,7 +1274,7 @@ DONATE_ADDRESSES = (
     {
         "label": "Epicbox",
         "note": "Send over Epicbox.",
-        "value": "esWxboBPMgL4RqufRYcGUJ7t6YVWGvyuid6xRM62UkRzSb3jUcNK@epicbox.epiccash.com",
+        "value": "esWxboBPMgL4RqufRYcGUJ7t6YVWGvyuid6xRM62UkRzSb3jUcNK@epicbox.btlabs.uk",
         "qr": "epicbox",
     },
     {
@@ -1291,8 +1292,27 @@ DONATE_ADDRESSES = (
 )
 
 
-def render_donate(*, settings: Settings) -> str:
-    """The donate page: static addresses and a thank-you, no snapshot needed."""
+def render_donate(
+    *,
+    settings: Settings,
+    epicbox_address: str | None = None,
+    epicbox_qr_svg: str | None = None,
+) -> str:
+    """The donate page: a thank-you and the addresses, no snapshot needed.
+
+    The Epicbox address comes from BT Labs' signed public file (see `btlabs_public`) and
+    its QR is drawn from it; both fall back to the entry in `DONATE_ADDRESSES`. The QR is
+    inlined, so no cache can show the QR of an address that has since changed.
+    """
+    addresses = []
+    for entry in DONATE_ADDRESSES:
+        entry = {**entry, "qr_src": None}
+        if entry["qr"] == "epicbox" and epicbox_address:
+            entry["value"] = epicbox_address
+            if epicbox_qr_svg:
+                encoded = base64.b64encode(epicbox_qr_svg.encode("utf-8")).decode("ascii")
+                entry["qr_src"] = f"data:image/svg+xml;base64,{encoded}"
+        addresses.append(entry)
     context = _base_context(None, settings)
-    context["donate_addresses"] = DONATE_ADDRESSES
+    context["donate_addresses"] = addresses
     return _environment().get_template("donate.html").render(**context)

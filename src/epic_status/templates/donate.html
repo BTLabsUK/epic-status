@@ -5,8 +5,8 @@
 
 {#
   One page, three addresses. Full values are shown (they wrap, never truncate) because
-  someone checking an address before paying wants to read all of it. QR codes are static
-  SVGs in /static/qr, opened per address with <details>: no script, works over Tor.
+  someone checking an address before paying wants to read all of it. QR codes are SVGs (the Epicbox one
+  drawn from the live address and inlined, the rest static in /static/qr), opened per address with <details>: no script, works over Tor.
 #}
 
 {% block content %}
@@ -28,7 +28,7 @@
       <p class="donate-addr"><code>{{ d.value }}</code>{{ copy_btn(d.value, d.label ~ " address") }}</p>
       <details class="donate-qr">
         <summary>Show QR code</summary>
-        <img src="/static/qr/{{ d.qr }}.svg" width="168" height="168" alt="QR code for the {{ d.label }} address" />
+        <img src="{{ d.qr_src or '/static/qr/' ~ d.qr ~ '.svg' }}" width="168" height="168" alt="QR code for the {{ d.label }} address" />
       </details>
     </article>
     {% endfor %}

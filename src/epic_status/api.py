@@ -38,6 +38,7 @@ from fastapi.staticfiles import StaticFiles
 
 from . import admin_routes, schemas, server_icons
 from .badges import badge_for
+from .btlabs_public import BtlabsPublic
 from .config import Settings, load_seed_targets
 from .config import settings as get_settings
 from .db import Database
@@ -45,7 +46,9 @@ from .models import Chain, Event, Kind, Severity, Snapshot, State, Target, Targe
 from .net import build_client
 from .poller import Poller
 from .quickcheck import QuickChecker, QuickCheckResult, run_check
+from .reach import ReachError, ReachLimiter, parse_port, public_address, reach
 from .render import (
+    DONATE_ADDRESSES,
     probe_url,
     render_api,
     render_donate,
@@ -171,6 +174,9 @@ class Service:
         # value whose only job is rate limiting.
         self.submitter_salt = secrets.token_hex(16)
         self.quickcheck = QuickChecker(settings)
+        # Its own allowance and salt: a wallet checking its port does not use up the
+        # visitor's quick checks, nor the other way round.
+        self.reach_limiter = ReachLimiter(secrets.token_hex(16))
         # Read at boot like the target registry: a malformed icons.toml stops the service
         # rather than publishing with limits nobody chose.
         self.icon_settings = server_icons.load_icon_settings(settings.icons_file)
@@ -298,6 +304,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     # itself broken to exactly the tools most likely to watch it.
     app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
     app.state.service = service
+    btlabs_public = BtlabsPublic(
+        url=settings.btlabs_public_url,
+        fallback=DONATE_ADDRESSES[0]["value"],
+        cache_path=settings.db.parent / "btlabs-public.json",
+    )
 
     @app.middleware("http")
     async def mark_onion_requests(request: Request, call_next: Any) -> Any:
@@ -540,8 +551,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.api_route("/donate", methods=["GET", "HEAD"], include_in_schema=False)
     async def donate() -> HTMLResponse:
+        address = await btlabs_public.address()
         return HTMLResponse(
-            render_donate(settings=settings),
+            render_donate(
+                settings=settings,
+                epicbox_address=address,
+                epicbox_qr_svg=btlabs_public.qr(address),
+            ),
             headers={"cache-control": "no-store", **security_headers()},
         )
 
@@ -824,6 +840,41 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             """
             return await _quick_check_route(service, request)
 
+    # Wallet connectivity self-test (docs/wallet-connectivity.md). Not in the public schema,
+    # like the quick check: `reach` makes this server connect somewhere. Plain JSON without
+    # CORS: wallets read it outside a browser, and a page that could read `reach` would be
+    # port-scanning its visitor's own address through us. Browsers steered by another site are
+    # refused outright (`_selftest_guard`); a client that sends no browser headers is left to
+    # the rate limits.
+    @app.get("/api/v1/ip", include_in_schema=False)
+    async def my_ip(request: Request) -> Response:
+        """The address this request came from, as the internet sees it."""
+        if (refused := _selftest_guard(request)) is not None:
+            return refused
+        try:
+            ip = public_address(_peer(request), onion=onion_request.get())
+        except ReachError as exc:
+            return _selftest_json({"error": exc.message}, exc.status)
+        return _selftest_json({"ip": ip})
+
+    @app.get("/api/v1/reach", include_in_schema=False)
+    async def reach_route(request: Request) -> Response:
+        """Whether `port` on the requester's own address answers from outside."""
+        if (refused := _selftest_guard(request)) is not None:
+            return refused
+        try:
+            ip = public_address(_peer(request), onion=onion_request.get())
+            port = parse_port(request.query_params.get("port"))
+            result = await reach(
+                ip, port, limiter=service.reach_limiter, local=service.quickcheck.local
+            )
+        except ReachError as exc:
+            response = _selftest_json({"error": exc.message}, exc.status)
+            if exc.retry_after:
+                response.headers["retry-after"] = str(exc.retry_after)
+            return response
+        return _selftest_json(result)
+
     @app.head("/api/v1/health", include_in_schema=False)
     @app.get(
         "/api/v1/health",
@@ -979,6 +1030,19 @@ async def _run_validator(service: Service) -> None:
 _CHECK_BODY_LIMIT = 4096
 
 
+def _peer(request: Request) -> str:
+    """Who connected to nginx: `x-real-ip`, which the vhost sets to `$remote_addr` over
+    anything the client sent, else the socket peer (loopback, so refused downstream).
+
+    Not `client_address`: that falls back to the last `x-forwarded-for` entry, which is good
+    enough for a rate-limit key but not for the address `reach` connects to.
+    """
+    real = request.headers.get("x-real-ip", "").strip()
+    if real:
+        return real
+    return request.client.host if request.client else ""
+
+
 def _check_response(payload: dict[str, Any], status_code: int) -> Response:
     # No cors() here, deliberately: see quick_check_api.
     return JSONResponse(
@@ -1020,6 +1084,17 @@ def _same_origin_post(request: Request) -> bool:
         return origin is None
     host = request.headers.get("host") or ""
     return origin.split("://", 1)[-1].rstrip("/") == host
+
+
+def _selftest_json(payload: dict[str, Any], status_code: int = 200) -> Response:
+    return JSONResponse(payload, status_code=status_code, headers={"cache-control": "no-store"})
+
+
+def _selftest_guard(request: Request) -> Response | None:
+    """A 403 when a browser is being steered by another site into /ip or /reach."""
+    if _same_origin_post(request):
+        return None
+    return _selftest_json({"error": "cross-site requests are refused"}, 403)
 
 
 async def _quick_check_route(service: Service, request: Request) -> Response:
