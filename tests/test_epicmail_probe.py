@@ -548,7 +548,7 @@ def test_api_epicmail_detail_matches_its_documented_schema() -> None:
     assert set(detail["health"]) == set(schemas.EpicmailHealth.model_fields)
 
 
-def test_board_shows_the_badge_the_pitch_and_the_panel() -> None:
+def test_board_shows_the_badge_and_the_panel() -> None:
     from datetime import UTC, datetime
 
     from epic_status.models import NetworkSummary, Snapshot
@@ -566,9 +566,8 @@ def test_board_shows_the_badge_the_pitch_and_the_panel() -> None:
     )
     html = render_board(snapshot=snap, settings=Settings())
     assert html.count('class="em-badge"') == 1
-    assert "Epicmail is the recommended relay." in html
-    assert "1 of 2 relays here run it." in html
-    assert "tools/get.sh | sh -s -- --domain relay.example.org" in html
+    assert "recommended relay" not in html
+    assert "tools/get.sh" not in html
     assert "https://github.com/BTLabsUK/epicmail" in html
     assert 'class="d-em"' in html
     assert "message store" in html

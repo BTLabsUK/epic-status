@@ -50,11 +50,5 @@ WALLET_URL: Final = f"{_WALLET_REPO}/releases/tag/v{WALLET}"
 NODE_RELEASES_URL: Final = f"{_NODE_REPO}/releases"
 EPICBOX_URL: Final = f"{_EPICBOX_REPO}/tree/{EPICBOX_PROTOCOL}"
 
-#: Epicmail, the relay the board recommends: the same Epicbox protocol, plus transaction
-#: cancel (3.1.0), mux/1 and an HTTPS pull API. Linked to the repository, whose README is
-#: the install guide, and its one-command install copied verbatim from that README.
+#: Epicmail's repository, linked from the Epicmail block in a relay's panel.
 EPICMAIL_URL: Final = "https://github.com/BTLabsUK/epicmail"
-EPICMAIL_INSTALL: Final = (
-    "curl -fsSL https://raw.githubusercontent.com/BTLabsUK/epicmail/main/tools/get.sh"
-    " | sh -s -- --domain relay.example.org"
-)

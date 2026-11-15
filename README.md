@@ -48,7 +48,7 @@ the service: `uv run epic-status check node.epiccash.com:3413`.
 
 [Epicmail](https://github.com/BTLabsUK/epicmail) is an Epicbox relay that speaks the same
 websocket protocol and adds transaction cancel (protocol 3.1.0), mux/1 and an HTTPS pull
-API. The board recommends it, marks the relays that run it, and reads more about them:
+API. The board marks the relays that run it and reads more about them:
 
 - **Detection.** A relay is Epicmail when its `/.well-known/epicbox.json` says
   `"software": "epicmail"`. Nothing needs configuring; a relay submitted as an Epicbox

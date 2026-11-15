@@ -721,9 +721,7 @@ def _base_context(
         "icon_warn": icons.triangle_alert(12),
         "icon_peers": icons.users(13),
         "icon_epicmail": icons.epicmail(14),
-        "icon_epicmail_lg": icons.epicmail(20),
         "epicmail_url": releases.EPICMAIL_URL,
-        "epicmail_install": releases.EPICMAIL_INSTALL,
         "peers_note": peers_note,
         "epicbox_url": releases.EPICBOX_URL,
         # Strictly-older, not merely-different. A relay ahead of the published

@@ -4,7 +4,6 @@
    lag_note. Without it the page renders as a 500 rather than degrading. #}
 {% import "_row.html" as r with context %}
 {% import "_quickcheck.html" as qcm with context %}
-{% from "_copy.html" import copy_btn %}
 {% set page = 'board' %}
 {# No title override. The served title is the bare site name for link previews; the
    live state is put in the tab by app.js from `data-live-title`. See base.html. #}
@@ -180,25 +179,6 @@
     <span class="group-count">
       latest: <a class="rel" href="{{ epicbox_url }}" rel="noreferrer">{{ epicbox_protocol }}</a>
     </span>
-  </div>
-  {#
-    The recommendation, one line under the heading and inside the group so it folds with it.
-    Plain, like the rest of the page: what Epicmail is, what it adds, how many of these relays
-    run it, and how to run one. No box: it is a sentence, and the rows below carry the badge.
-    The install command is the README's own, with a copy button; the link is the repository.
-  #}
-  {% set em_count = relays | selectattr('is_epicmail') | list | length %}
-  <div class="em-pitch">
-    <p>{{ icon_epicmail_lg }}<span><b>Epicmail is the recommended relay.</b> Same Epicbox protocol, so
-      wallets need no change; adds transaction cancel (protocol 3.1.0), mux/1 and an HTTPS pull API.
-      One Rust binary with SQLite inside.{% if relays %}
-      <span class="em-count">{{ em_count }} of {{ relays | length }} relay{{ '' if relays | length == 1 else 's' }} here run{{ 's' if relays | length == 1 else '' }} it.</span>{% endif %}</span></p>
-    <details class="em-run">
-      <summary>Run a relay</summary>
-      <p>On a Linux server with systemd, point a domain at it, open ports 80 and 443, and run:</p>
-      <div class="em-cmd"><code>{{ epicmail_install }}</code>{{ copy_btn(epicmail_install, 'install command') }}</div>
-      <p><a href="{{ epicmail_url }}" rel="noreferrer">Epicmail on GitHub</a>: signed release binaries, the install options and the operating guide. Then <a href="/add">add the relay here</a>.</p>
-    </details>
   </div>
   <div class="group-body" id="gb-epicbox">
   {% if relays %}

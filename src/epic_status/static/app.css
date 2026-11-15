@@ -5255,9 +5255,8 @@ input[data-state='failed'] {
 
 /* ------------------------------------------------------------------ Epicmail
  *
- * A relay that says it runs Epicmail, in its own /.well-known/epicbox.json. Three places:
- * a word with the envelope mark beside the host name, one line under the Relays heading,
- * and a block in the relay's panel. The mark keeps the repository's two colours; everything
+ * A relay that says it runs Epicmail, in its own /.well-known/epicbox.json. Two places:
+ * a word with the envelope mark beside the host name, and a block in the relay's panel. The mark keeps the repository's two colours; everything
  * else is the page's own type and hairlines, and no state colour is spent on it. */
 .icon-epicmail .em-body {
   stroke: var(--em-body);
@@ -5287,101 +5286,6 @@ input[data-state='failed'] {
 }
 
 .em-badge .icon-epicmail {
-  flex: none;
-}
-
-.em-pitch {
-  display: grid;
-  gap: var(--sp-8);
-  margin: 0 0 var(--sp-16);
-  max-width: 78ch;
-  font-size: var(--t-small);
-  color: var(--ink-dim);
-}
-
-.em-pitch > p {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--sp-8);
-  margin: 0;
-  line-height: 1.5;
-}
-
-.em-pitch > p > .icon-epicmail {
-  flex: none;
-  margin-top: 1px;
-}
-
-.em-pitch b {
-  color: var(--ink);
-  font-weight: 600;
-}
-
-.em-count {
-  white-space: nowrap;
-  font-family: var(--font-mono);
-  font-size: var(--t-micro);
-}
-
-/* Indented to the text above, past the mark, so the disclosure reads as part of that line. */
-.em-run {
-  margin-left: calc(20px + var(--sp-8));
-}
-
-.em-run > summary {
-  display: inline-flex;
-  align-items: center;
-  min-height: 28px;
-  cursor: pointer;
-  color: var(--primary);
-  font-weight: 600;
-  list-style: none;
-}
-
-.em-run > summary::-webkit-details-marker {
-  display: none;
-}
-
-.em-run > summary::after {
-  content: '';
-  width: 0.4em;
-  height: 0.4em;
-  margin-left: var(--sp-6);
-  border-right: 1.5px solid currentColor;
-  border-bottom: 1.5px solid currentColor;
-  transform: translateY(-2px) rotate(45deg);
-  transition: transform var(--dur) var(--ease);
-}
-
-.em-run[open] > summary::after {
-  transform: translateY(1px) rotate(225deg);
-}
-
-.em-run > p {
-  margin: var(--sp-6) 0;
-}
-
-.em-cmd {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--sp-4);
-  padding: var(--sp-8) var(--sp-8) var(--sp-8) var(--sp-12);
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  background: var(--code-bg);
-}
-
-.em-cmd code {
-  flex: 1;
-  min-width: 0;
-  font-family: var(--font-mono);
-  font-size: var(--t-micro);
-  line-height: 1.6;
-  color: var(--code-ink);
-  overflow-wrap: anywhere;
-}
-
-.em-cmd .copy-btn {
   flex: none;
 }
 
@@ -5418,11 +5322,6 @@ input[data-state='failed'] {
   color: var(--danger-ink);
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .em-run > summary::after {
-    transition: none;
-  }
-}
 
 .em-submit-note {
   display: flex;

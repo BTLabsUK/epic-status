@@ -71,8 +71,7 @@ and works as a plain form post with JavaScript off.
 | `--primary` / `--mark` | Gold. Brand and focus, never state. |
 | `--em-body` / `--em-flap` | The Epicmail envelope's two strokes, from the Epicmail repository's light and dark icons. Used only in that mark. |
 
-The Epicmail badge, the line recommending Epicmail under the Relays heading and the
-Epicmail block in a relay's panel use the page's own type, hairlines and gold link colour;
+The Epicmail badge and the Epicmail block in a relay's panel use the page's own type, hairlines and gold link colour;
 the envelope's blue flap is the only new hue, and it stays inside the 14-20px mark.
 
 Healthy is deliberately dull. Saturated hues are a budget, and spending them on the
