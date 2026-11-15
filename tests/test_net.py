@@ -115,7 +115,7 @@ async def test_rejection_names_the_offending_address() -> None:
 PUBLIC_TABLE = [
     ("1.1.1.1", True),
     ("8.8.8.8", True),
-    ("144.202.75.237", True),  # node.epiccash.com, Vultr
+    ("144.202.75.237", True),  # node.epiccash.com until Nov 2026 (now 155.138.246.213), Vultr
     ("95.217.197.180", True),  # a documented mainnet seed, Hetzner
     ("2606:4700::1111", True),
     ("172.32.0.1", True),  # one address past the end of RFC1918's 172.16/12

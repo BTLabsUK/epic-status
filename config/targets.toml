@@ -33,8 +33,9 @@ p2p = "node.epiccash.com:3414"
 operator = "Epic Cash"
 label = "Default node"
 # Answered get_tip in ~120 ms, unauthenticated, CORS *. Shares its address
-# (144.202.75.237, Vultr) with epicbox.epiccash.com: the default node and the
-# default relay are one machine, so a single outage takes out both. Listed as two
+# (155.138.246.213, Vultr; moved from 144.202.75.237 in November 2026) with
+# epicbox.epiccash.com: the default node and the default relay are one machine,
+# so a single outage takes out both. The relay there now runs Epicmail. Listed as two
 # rows because they are two services, with the shared address surfaced in the
 # co-hosting count rather than hidden.
 notes = "Shares a host with epicbox.epiccash.com"
