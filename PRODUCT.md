@@ -57,9 +57,14 @@ What a neighboring status page could not truthfully copy is the honesty model:
   `api_secret` and are absent rather than faked. Country is labelled low-confidence
   because RDAP is inconsistent. Latency is stated per vantage point, and a remote
   prober's view is shown beside the verdict rather than averaged into it.
-- **It refuses to become a weapon.** No HTTP GET against a relay, no `Subscribe` or
-  `PostSlate`, no probing from the reader's browser, and a submit path built as three
-  independent SSRF guards.
+- **It refuses to become a weapon.** No polling of a classic relay over HTTP (its
+  status page fans out to other relays), no `Subscribe` or `PostSlate`, no probing from
+  the reader's browser, and a submit path built as three independent SSRF guards. The
+  one HTTP read a classic relay can get is Epicmail detection: one GET of
+  `/.well-known/epicbox.json` when it is first seen, when its `GetVersion` answer
+  changes, and otherwise once a week. Relays that identify themselves as Epicmail
+  publish static JSON for monitors, and only those are read on a schedule
+  (`/status.json` every two minutes, the info document every six hours).
 
 ## Operating Context
 

@@ -44,6 +44,34 @@ name for where it runs, such as `yourname-nyc`). Keep `.env` out of git. `config
 lists what to monitor and ships with the known public hosts. To probe one host without starting
 the service: `uv run epic-status check node.epiccash.com:3413`.
 
+## Epicmail relays
+
+[Epicmail](https://github.com/BTLabsUK/epicmail) is an Epicbox relay that speaks the same
+websocket protocol and adds transaction cancel (protocol 3.1.0), mux/1 and an HTTPS pull
+API. The board recommends it, marks the relays that run it, and reads more about them:
+
+- **Detection.** A relay is Epicmail when its `/.well-known/epicbox.json` says
+  `"software": "epicmail"`. Nothing needs configuring; a relay submitted as an Epicbox
+  relay gets the badge the same way. The document is read when a relay is first seen,
+  when its websocket `GetVersion` answer changes, and otherwise once a week (every six
+  hours for a relay already known to be Epicmail). The classic relay answers that path
+  with its status page, which is why it stays rare.
+- **Health.** For an Epicmail relay, `/status.json` is read every two minutes (`/ready`
+  when it is missing): version, uptime, open sockets, listening mailboxes, waiting
+  messages, the forward queue, and whether the message store is OK. A relay that
+  completes the handshake but reports its store failing or a restart in progress is
+  shown as degraded. Counts only; nothing that identifies a wallet is read or published.
+- **The websocket handshake stays the check of record** for every relay, Epicmail or
+  not, so uptime figures mean the same thing for all of them.
+- **API.** Each relay in `/api/v1/status.json` gains `software` (`"epicmail"`, another
+  self-described name, or `null`) and `epicmail` (the details above, or `null`).
+  `/api/v1/epicbox.json` gains an `epicmail` list: the hosts in `epicbox` that run it.
+  No existing field changed.
+
+Cadences are `EPIC_STATUS_CADENCE__EPICMAIL_STATUS_S`, `EPIC_STATUS_CADENCE__EPICMAIL_INFO_S`,
+`EPIC_STATUS_CADENCE__RELAY_DETECT_S` and `EPIC_STATUS_CADENCE__EPICMAIL_TIMEOUT_S`. By hand:
+`uv run epic-status check wss://epicbox.example.org` prints what the board would see.
+
 ## Configuration extras
 
 ### Connect your own Epic node (optional)
