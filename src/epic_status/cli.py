@@ -21,6 +21,7 @@ from .config import settings as get_settings
 from .db import Database
 from .models import Kind
 from .net import TargetRejected, build_client, peer_certificate_expiry, resolve_endpoint
+from .probes import epicmail
 from .probes.epicbox import probe_relay
 from .probes.node import probe_tip, probe_version
 from .probes.pool import probe_pool
@@ -210,6 +211,22 @@ async def _check(kind: Kind, raw: str, adapter: str | None = None) -> dict[str, 
         cert_expires_in_days=days,
         error=relay.error,
     )
+    if relay.ok:
+        # One look at the relay's info document, and its counters if it is Epicmail: the
+        # same two reads the poller makes, so an operator sees what the board will show.
+        async with build_client(timeout=settings.http_timeout_s) as client:
+            timeout = settings.cadence.epicmail_timeout_s
+            answered, info = await epicmail.detect(client, resolved, timeout=timeout)
+            out["software"] = info.software if info is not None else None
+            if not answered:
+                out["software_error"] = "info document did not answer"
+            if info is not None and info.is_epicmail:
+                health = await epicmail.read_health(client, resolved, timeout=timeout)
+                out["epicmail"] = {
+                    **info.model_dump(mode="json", exclude={"software"}),
+                    "cancel": info.cancel,
+                    "health": health.model_dump(mode="json"),
+                }
     return out
 
 

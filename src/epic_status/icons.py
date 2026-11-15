@@ -92,3 +92,24 @@ def check_check(size: int = 15) -> Markup:
 
 def triangle_alert(size: int = 12) -> Markup:
     return _icon("warn", _TRIANGLE_ALERT, size)
+
+
+#: The Epicbox envelope from the Epicmail repository (`docs/assets/epicbox-icon-light.svg`
+#: and `-dark.svg`, Apache-2.0, https://github.com/BTLabsUK/epicmail), paths unchanged. The
+#: repository ships two files that differ only in their two stroke colours; here the colours
+#: come from `--em-body` and `--em-flap`, so the mark follows this page's theme toggle, which
+#: a `<picture>` keyed on `prefers-color-scheme` would not.
+_EPICMAIL_BODY: Final = (
+    "M21 8.5V7.5A3.5 3.5 0 0 0 17.5 4h-11A3.5 3.5 0 0 0 3 7.5v9A3.5 3.5 0 0 0 6.5 20h11"
+    "a3.5 3.5 0 0 0 3.5-3.5"
+)
+_EPICMAIL_FLAP: Final = "M3 8.5L12 14L21 8.5"
+
+
+def epicmail(size: int = 14) -> Markup:
+    return Markup(
+        f'<svg class="icon icon-epicmail" width="{size}" height="{size}" viewBox="0 0 24 24" '
+        'fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" '
+        f'aria-hidden="true"><path class="em-body" d="{_EPICMAIL_BODY}"/>'
+        f'<path class="em-flap" d="{_EPICMAIL_FLAP}"/></svg>'
+    )

@@ -42,7 +42,17 @@ from .btlabs_public import BtlabsPublic
 from .config import Settings, load_seed_targets
 from .config import settings as get_settings
 from .db import Database
-from .models import Chain, Event, Kind, Severity, Snapshot, State, Target, TargetStatus
+from .models import (
+    EPICMAIL,
+    Chain,
+    Event,
+    Kind,
+    Severity,
+    Snapshot,
+    State,
+    Target,
+    TargetStatus,
+)
 from .net import build_client
 from .poller import Poller
 from .quickcheck import QuickChecker, QuickCheckResult, run_check
@@ -693,6 +703,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 "generated_at": stamp(snap.generated_at),
                 "chain": snap.network.chain.value,
                 "epicbox": [s.target.display_host for s in rows],
+                # Added: the same hosts' subset that runs Epicmail, in the same order.
+                "epicmail": [s.target.display_host for s in rows if s.is_epicmail],
             }
         )
 
@@ -956,6 +968,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             "Send `multipart/form-data` to include an optional `icon` file: PNG, JPEG or "
             "WebP, up to 1 MB and 2048×2048, still images only (SVG is refused). It is "
             "re-encoded to square PNGs and published only after an operator approves it.\n\n"
+            "`kind` is `node`, `epicbox`, `epicmail` or `pool`. `epicmail` is an Epicbox "
+            "relay running Epicmail and is handled as `epicbox`: Epicmail is detected from "
+            "the relay's own `/.well-known/epicbox.json`, so either kind gets the badge.\n\n"
             "Hosts resolving to private, loopback, link-local or reserved addresses "
             "are refused before anything is stored or contacted. Epicbox hostnames "
             "may contain only letters, digits and dots — a hyphen means the relay "
@@ -1137,8 +1152,14 @@ async def _do_submit(
     country: str = "",
     icon: UploadFile | None = None,
 ) -> tuple[str | None, str | None]:
+    # `epicmail` is an Epicbox relay that runs Epicmail. It is queued and probed as a relay
+    # like any other; the badge comes from the relay's own /.well-known/epicbox.json, so a
+    # relay sent as `epicbox` that runs Epicmail gets it too, and one sent as `epicmail`
+    # that does not is listed as a plain relay.
+    raw_kind = kind.strip().lower()
+    said_epicmail = raw_kind == EPICMAIL
     try:
-        parsed_kind = Kind(kind.strip().lower())
+        parsed_kind = Kind.EPICBOX if said_epicmail else Kind(raw_kind)
     except ValueError:
         return None, "Choose a node, an Epicbox relay or a mining pool."
     # The icon is checked first, so a refused image refuses the whole request: the
@@ -1180,6 +1201,11 @@ async def _do_submit(
         )
         log.info("icon %s submitted for %s, pending review", item.hash, display)
         message = f"{message} The icon is reviewed separately before it is shown."
+    if said_epicmail:
+        message = (
+            f"{message} The Epicmail badge appears once the relay's "
+            "/.well-known/epicbox.json says it runs Epicmail."
+        )
     return message, None
 
 
@@ -1417,6 +1443,52 @@ def _serialise(
     }
 
 
+def epicmail_detail(status: TargetStatus) -> dict[str, Any] | None:
+    """The `epicmail` object on a relay row: what the relay publishes about itself and
+    its latest counters. Null for a relay not detected as Epicmail. Counts only — the
+    relay's documents carry no addresses or client IPs, and only these fields are
+    copied from them."""
+    info = status.relay_info
+    if info is None or not info.is_epicmail:
+        return None
+    health = status.relay_health
+    return {
+        "version": info.version,
+        "protocol_versions": info.protocol_versions,
+        "cancel": info.cancel,
+        "mux": info.mux,
+        "https_api": (
+            None
+            if info.https_protocol is None
+            else {"protocol": info.https_protocol, "ok": info.https_ok}
+        ),
+        "federation": info.federation,
+        "info_checked_at": stamp(info.checked_at),
+        "health": (
+            None
+            if health is None
+            else {
+                "ok": health.ok,
+                "source": health.source,
+                "ready": health.ready,
+                "draining": health.draining,
+                "store_ok": health.store_ok,
+                "version": health.version,
+                "uptime_s": health.uptime_s,
+                "sockets": health.sockets,
+                "listening_mailboxes": health.listening_mailboxes,
+                "classic_subscriptions": health.classic_subscriptions,
+                "mux_holders": health.mux_holders,
+                "messages_waiting": health.messages_waiting,
+                "forwards_waiting": health.forwards_waiting,
+                "forward_peers": health.forward_peers,
+                "error": health.error,
+                "checked_at": stamp(health.checked_at),
+            }
+        ),
+    }
+
+
 def _round4(value: float | None) -> float | None:
     """Four decimal places, preserving None.
 
@@ -1545,6 +1617,10 @@ def _serialise_target(status: TargetStatus) -> dict[str, Any]:
         row["protocol_version"] = status.protocol_version
         row["cert_expires_in_days"] = status.cert_expires_in_days
         row["ipv6"] = status.ipv6.value if status.ipv6 is not None else None
+        # Added fields only. `software` is what the relay calls itself in its
+        # `/.well-known/epicbox.json`, or null for the classic relay, which has none.
+        row["software"] = status.software
+        row["epicmail"] = epicmail_detail(status)
     elif target.kind is Kind.POOL:
         row["miners"] = status.miners
         row["workers"] = status.workers

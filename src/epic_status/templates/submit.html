@@ -21,10 +21,20 @@
     <span>Kind</span>
     <select name="kind">
       <option value="node">Public node</option>
-      <option value="epicbox">Epicbox relay</option>
+      <option value="epicmail">Epicmail relay (recommended)</option>
+      <option value="epicbox">Epicbox relay, other software</option>
       <option value="pool">Mining pool</option>
     </select>
   </label>
+
+  {#
+    Epicmail is offered by name so a relay operator sees it, but the choice is a hint: the
+    badge comes from the relay's own /.well-known/epicbox.json, so either relay option ends
+    in the same place.
+  #}
+  <p class="field-note em-submit-note">{{ icon_epicmail }}<span>Relays running
+    <a href="{{ epicmail_url }}" rel="noreferrer">Epicmail</a> are recognised automatically and
+    marked on the board, whichever relay option is chosen.</span></p>
 
   <label class="field">
     <span>Host</span>

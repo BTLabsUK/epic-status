@@ -135,6 +135,11 @@
   --info-bg: rgba(51, 154, 240, 0.14);
   --info-line: rgba(51, 154, 240, 0.5);
   --info-dot: #339af0;
+
+  /* The Epicmail mark, in the colours of the repository's -dark icon. Its blue flap is the
+     one hue on the page that is neither gold nor a state, so it is kept to the mark. */
+  --em-body: #f5f1e8;
+  --em-flap: #7fa8ff;
 }
 
 /* Light mode is charcoal chrome on warm paper, not white with dark text.
@@ -183,6 +188,10 @@
   --info-bg: rgba(51, 154, 240, 0.12);
   --info-line: rgba(51, 154, 240, 0.45);
   --info-dot: #1b7fd4;
+
+  /* The repository's -light icon. */
+  --em-body: #1d1a14;
+  --em-flap: #2b55c7;
 }
 
 /* ----------------------------------------------------------------- reset */
@@ -5241,4 +5250,187 @@ input[data-state='failed'] {
 .d-ident-text span {
   color: var(--ink-dim);
   font-size: var(--t-small);
+}
+
+
+/* ------------------------------------------------------------------ Epicmail
+ *
+ * A relay that says it runs Epicmail, in its own /.well-known/epicbox.json. Three places:
+ * a word with the envelope mark beside the host name, one line under the Relays heading,
+ * and a block in the relay's panel. The mark keeps the repository's two colours; everything
+ * else is the page's own type and hairlines, and no state colour is spent on it. */
+.icon-epicmail .em-body {
+  stroke: var(--em-body);
+}
+
+.icon-epicmail .em-flap {
+  stroke: var(--em-flap);
+}
+
+.em-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-4);
+  margin-left: var(--sp-8);
+  padding: 0 var(--sp-6) 0 var(--sp-4);
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  font-family: var(--font-ui);
+  font-size: var(--t-micro);
+  font-weight: 600;
+  line-height: 1.5;
+  letter-spacing: 0.01em;
+  color: var(--ink);
+  vertical-align: 1px;
+  white-space: nowrap;
+  cursor: help;
+}
+
+.em-badge .icon-epicmail {
+  flex: none;
+}
+
+.em-pitch {
+  display: grid;
+  gap: var(--sp-8);
+  margin: 0 0 var(--sp-16);
+  max-width: 78ch;
+  font-size: var(--t-small);
+  color: var(--ink-dim);
+}
+
+.em-pitch > p {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-8);
+  margin: 0;
+  line-height: 1.5;
+}
+
+.em-pitch > p > .icon-epicmail {
+  flex: none;
+  margin-top: 1px;
+}
+
+.em-pitch b {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.em-count {
+  white-space: nowrap;
+  font-family: var(--font-mono);
+  font-size: var(--t-micro);
+}
+
+/* Indented to the text above, past the mark, so the disclosure reads as part of that line. */
+.em-run {
+  margin-left: calc(20px + var(--sp-8));
+}
+
+.em-run > summary {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  cursor: pointer;
+  color: var(--primary);
+  font-weight: 600;
+  list-style: none;
+}
+
+.em-run > summary::-webkit-details-marker {
+  display: none;
+}
+
+.em-run > summary::after {
+  content: '';
+  width: 0.4em;
+  height: 0.4em;
+  margin-left: var(--sp-6);
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: translateY(-2px) rotate(45deg);
+  transition: transform var(--dur) var(--ease);
+}
+
+.em-run[open] > summary::after {
+  transform: translateY(1px) rotate(225deg);
+}
+
+.em-run > p {
+  margin: var(--sp-6) 0;
+}
+
+.em-cmd {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-4);
+  padding: var(--sp-8) var(--sp-8) var(--sp-8) var(--sp-12);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--code-bg);
+}
+
+.em-cmd code {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--font-mono);
+  font-size: var(--t-micro);
+  line-height: 1.6;
+  color: var(--code-ink);
+  overflow-wrap: anywhere;
+}
+
+.em-cmd .copy-btn {
+  flex: none;
+}
+
+.d-em {
+  margin-top: var(--sp-16);
+  padding-top: var(--sp-12);
+  border-top: 1px solid var(--line);
+}
+
+.d-em-head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-6);
+  margin: 0 0 var(--sp-12);
+  font-size: var(--t-small);
+}
+
+.d-em-head b {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.d-em-head a {
+  margin-left: auto;
+  font-size: var(--t-micro);
+}
+
+.d-em .d-hint {
+  color: var(--ink-dim);
+  font-size: var(--t-micro);
+}
+
+.d-em .d-bad {
+  color: var(--danger-ink);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .em-run > summary::after {
+    transition: none;
+  }
+}
+
+.em-submit-note {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-6);
+}
+
+.em-submit-note .icon-epicmail {
+  flex: none;
+  margin-top: 3px;
 }

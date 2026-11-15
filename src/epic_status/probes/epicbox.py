@@ -15,9 +15,11 @@ a holding page with the relay dead.
 
 Three things this deliberately does not do:
 
-* **No HTTP GET.** Rendering a relay's own status page fires three outbound TLS
-  connections to other relays so it can draw their status dots. Polling it would
-  make this service an amplifier aimed at the hosts it exists to help.
+* **No HTTP GET here.** Rendering a classic relay's own status page fires three
+  outbound TLS connections to other relays so it can draw their status dots, and it
+  answers every path with that page. Polling it would make this service an amplifier
+  aimed at the hosts it exists to help. Epicmail relays publish JSON for monitors
+  instead; `probes.epicmail` reads those, and asks a classic relay only rarely.
 * **No Subscribe.** It would work — the signing scheme is reproducible without a
   wallet — but it registers a throwaway key in a stranger's datastore on every
   poll, and it costs the relay a fork-exec of its crypto helper.

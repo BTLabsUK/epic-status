@@ -1,0 +1,600 @@
+"""Epicmail relays: detection, parsing, the poller's schedule, the API and the board.
+
+The bodies in `fixtures/epicmail/` were recorded once from the live relay
+(epicmail.btlabs.uk, Epicmail 0.1.1) and from a classic relay; see the README there.
+Nothing here touches the network: HTTP goes to respx, and the poller's resolver is
+replaced with a fixed address.
+"""
+
+from __future__ import annotations
+
+import json
+from collections.abc import AsyncIterator
+from pathlib import Path
+from typing import Any
+
+import httpx
+import pytest
+import respx
+
+from epic_status.config import Settings
+from epic_status.db import Database
+from epic_status.models import (
+    EpicboxProbe,
+    Kind,
+    Reason,
+    RelayHealth,
+    Source,
+    State,
+    Target,
+    TargetStatus,
+)
+from epic_status.net import Resolved, build_client
+from epic_status.poller import Poller
+from epic_status.probes import epicmail
+from epic_status.probes.epicmail import (
+    Fetched,
+    http_side,
+    parse_ready,
+    parse_status,
+    parse_v1_info,
+    parse_well_known,
+)
+
+FIXTURES = Path(__file__).parent / "fixtures" / "epicmail"
+
+
+def raw(name: str) -> bytes:
+    return (FIXTURES / name).read_bytes()
+
+
+def doc(name: str) -> Any:
+    return json.loads(raw(name))
+
+
+RESOLVED = Resolved(
+    hostname="epicmail.btlabs.uk",
+    port=443,
+    addresses=("203.0.113.7",),
+    scheme="wss",
+)
+BASE = "https://203.0.113.7:443"
+
+
+@pytest.fixture
+async def client() -> AsyncIterator[httpx.AsyncClient]:
+    c = build_client(timeout=2.0)
+    try:
+        yield c
+    finally:
+        await c.aclose()
+
+
+# --------------------------------------------------------------------------- parsing
+
+
+def test_well_known_from_the_live_relay() -> None:
+    info = parse_well_known(doc("well-known.json"))
+    assert info is not None
+    assert info.software == "epicmail"
+    assert info.is_epicmail
+    assert info.version == "0.1.1"
+    assert info.protocol_versions == ["2.0.0", "3.0.0", "3.1.0"]
+    assert info.cancel
+    assert info.mux
+    assert info.https_protocol == "epicbox-https/0.1"
+    assert info.federation is True
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {},
+        [],
+        "epicmail",
+        {"software": 7},
+        {"software": ""},
+        {"software": "x" * 100},
+        {"software": "epic\nmail"},
+        {"version": "0.1.1", "protocol_versions": ["3.1.0"]},
+    ],
+)
+def test_a_document_that_does_not_name_its_software_is_not_detected(payload: Any) -> None:
+    assert parse_well_known(payload) is None
+
+
+def test_other_self_described_software_is_named_but_not_epicmail() -> None:
+    info = parse_well_known({"software": "OtherRelay", "protocol_versions": ["3.0.0"]})
+    assert info is not None
+    assert info.software == "otherrelay"
+    assert not info.is_epicmail
+    assert not info.cancel
+
+
+def test_a_relay_without_3_1_0_has_no_cancel() -> None:
+    payload = doc("well-known.json") | {"protocol_versions": ["2.0.0", "3.0.0"], "features": {}}
+    info = parse_well_known(payload)
+    assert info is not None
+    assert not info.cancel
+    assert not info.mux
+    assert info.https_protocol is None
+
+
+def test_v1_info_must_name_the_announced_protocol() -> None:
+    info = parse_well_known(doc("well-known.json"))
+    assert info is not None
+    assert parse_v1_info(doc("v1-info.json"), info)
+    assert not parse_v1_info({"protocol": "something-else"}, info)
+    assert not parse_v1_info("nope", info)
+
+
+def test_status_from_the_live_relay() -> None:
+    h = parse_status(doc("status.json"))
+    assert h.ok
+    assert h.source == "status.json"
+    assert h.version == "0.1.1"
+    assert h.uptime_s == 2731
+    assert h.draining is False
+    assert h.store_ok is True
+    assert h.ready is True
+    assert h.fault is None
+    assert h.sockets == 8
+    assert h.listening_mailboxes == 8
+    assert h.classic_subscriptions == 8
+    assert h.mux_holders == 0
+    assert h.messages_waiting == 159
+    assert h.forwards_waiting == 0
+    assert h.forward_peers == 0
+
+
+def test_status_copies_counts_only() -> None:
+    """An allow-list: the relay's name and identity, store byte sizes, and a field a
+    future version might add are not republished."""
+    payload = doc("status.json") | {"addresses": ["esWD...@relay"], "client_ips": ["198.51.100.1"]}
+    dumped = parse_status(payload).model_dump()
+    text = json.dumps(dumped, default=str)
+    for leaked in ("esWD", "198.51.100.1", "epicmail.btlabs.uk", "db_bytes", "82173952"):
+        assert leaked not in text
+
+
+@pytest.mark.parametrize("bad", [-1, True, "8", 1.5, None])
+def test_status_counts_must_be_non_negative_integers(bad: Any) -> None:
+    h = parse_status(doc("status.json") | {"sockets": bad})
+    assert h.sockets is None
+
+
+def test_status_that_is_not_an_object_is_not_ok() -> None:
+    assert not parse_status(["nope"]).ok
+
+
+@pytest.mark.parametrize(
+    ("fetched", "ready", "fault"),
+    [
+        (Fetched(200, payload=doc("ready.json")), True, None),
+        (
+            Fetched(503, payload={"ready": False, "reason": "draining"}, error="HTTP 503"),
+            False,
+            "relay reports it is restarting",
+        ),
+        (
+            Fetched(503, payload={"ready": False, "reason": "store"}, error="HTTP 503"),
+            False,
+            "relay reports its message store is failing",
+        ),
+    ],
+)
+def test_ready_answers(fetched: Fetched, ready: bool, fault: str | None) -> None:
+    h = parse_ready(fetched)
+    assert h.ok
+    assert h.source == "ready"
+    assert h.ready is ready
+    assert h.fault == fault
+
+
+def test_ready_that_does_not_answer_is_not_ok() -> None:
+    h = parse_ready(Fetched(404, error="HTTP 404"))
+    assert not h.ok
+    assert h.fault is None
+
+
+def test_faults_from_status() -> None:
+    assert parse_status(doc("status.json") | {"draining": True}).fault == (
+        "relay reports it is restarting"
+    )
+    assert parse_status(doc("status.json") | {"store_ok": False}).fault == (
+        "relay reports its message store is failing"
+    )
+
+
+def test_http_side_keeps_the_validated_address() -> None:
+    https = http_side(RESOLVED)
+    assert (https.scheme, https.hostname, https.port, https.addresses) == (
+        "https",
+        "epicmail.btlabs.uk",
+        443,
+        ("203.0.113.7",),
+    )
+    plain = http_side(Resolved(hostname="r.test", port=80, addresses=("10.0.0.1",), scheme="ws"))
+    assert plain.scheme == "http"
+
+
+# ----------------------------------------------------------------------- over HTTP
+
+
+@respx.mock
+async def test_detect_epicmail_reads_info_and_v1(client: httpx.AsyncClient) -> None:
+    wk = respx.get(f"{BASE}/.well-known/epicbox.json").mock(
+        return_value=httpx.Response(200, content=raw("well-known.json"))
+    )
+    v1 = respx.get(f"{BASE}/v1/info").mock(
+        return_value=httpx.Response(200, content=raw("v1-info.json"))
+    )
+    answered, info = await epicmail.detect(client, RESOLVED, timeout=2.0)
+    assert answered
+    assert info is not None and info.is_epicmail
+    assert info.https_ok is True
+    assert wk.call_count == 1 and v1.call_count == 1
+    # Addressed to the validated IP, with the real name for virtual hosting.
+    request = wk.calls.last.request
+    assert request.headers["host"] == "epicmail.btlabs.uk"
+    assert request.url.host == "203.0.113.7"
+
+
+@respx.mock
+async def test_detect_classic_relay_is_a_definite_no(client: httpx.AsyncClient) -> None:
+    """The classic relay answers every path with its HTML status page."""
+    respx.get(f"{BASE}/.well-known/epicbox.json").mock(
+        return_value=httpx.Response(200, content=raw("classic-any-path.html"))
+    )
+    v1 = respx.get(f"{BASE}/v1/info")
+    answered, info = await epicmail.detect(client, RESOLVED, timeout=2.0)
+    assert (answered, info) == (True, None)
+    assert v1.call_count == 0
+
+
+@respx.mock
+async def test_detect_404_is_a_definite_no(client: httpx.AsyncClient) -> None:
+    respx.get(f"{BASE}/.well-known/epicbox.json").mock(return_value=httpx.Response(404))
+    assert await epicmail.detect(client, RESOLVED, timeout=2.0) == (True, None)
+
+
+@respx.mock
+async def test_detect_transport_failure_is_no_answer(client: httpx.AsyncClient) -> None:
+    respx.get(f"{BASE}/.well-known/epicbox.json").mock(
+        side_effect=httpx.ConnectTimeout("slow")
+    )
+    assert await epicmail.detect(client, RESOLVED, timeout=2.0) == (False, None)
+
+
+@respx.mock
+async def test_detect_https_api_not_answering(client: httpx.AsyncClient) -> None:
+    respx.get(f"{BASE}/.well-known/epicbox.json").mock(
+        return_value=httpx.Response(200, content=raw("well-known.json"))
+    )
+    respx.get(f"{BASE}/v1/info").mock(return_value=httpx.Response(404))
+    _, info = await epicmail.detect(client, RESOLVED, timeout=2.0)
+    assert info is not None and info.https_ok is False
+
+
+@respx.mock
+async def test_oversized_body_is_refused(client: httpx.AsyncClient) -> None:
+    respx.get(f"{BASE}/.well-known/epicbox.json").mock(
+        return_value=httpx.Response(200, content=b"{" + b" " * (epicmail.MAX_BODY + 10) + b"}")
+    )
+    assert await epicmail.detect(client, RESOLVED, timeout=2.0) == (True, None)
+
+
+@respx.mock
+async def test_redirect_is_not_followed(client: httpx.AsyncClient) -> None:
+    respx.get(f"{BASE}/.well-known/epicbox.json").mock(
+        return_value=httpx.Response(302, headers={"location": "http://169.254.169.254/"})
+    )
+    assert await epicmail.detect(client, RESOLVED, timeout=2.0) == (True, None)
+    assert len(respx.calls) == 1
+
+
+@respx.mock
+async def test_health_reads_status_json(client: httpx.AsyncClient) -> None:
+    status = respx.get(f"{BASE}/status.json").mock(
+        return_value=httpx.Response(200, content=raw("status.json"))
+    )
+    ready = respx.get(f"{BASE}/ready")
+    h = await epicmail.read_health(client, RESOLVED, timeout=2.0)
+    assert h.ok and h.messages_waiting == 159
+    assert status.call_count == 1
+    assert ready.call_count == 0
+
+
+@respx.mock
+async def test_health_falls_back_to_ready(client: httpx.AsyncClient) -> None:
+    respx.get(f"{BASE}/status.json").mock(return_value=httpx.Response(404))
+    respx.get(f"{BASE}/ready").mock(
+        return_value=httpx.Response(503, json={"ready": False, "reason": "store"})
+    )
+    h = await epicmail.read_health(client, RESOLVED, timeout=2.0)
+    assert h.ok and h.source == "ready"
+    assert h.fault == "relay reports its message store is failing"
+
+
+@respx.mock
+async def test_health_transport_failure_does_not_try_ready(client: httpx.AsyncClient) -> None:
+    respx.get(f"{BASE}/status.json").mock(side_effect=httpx.ConnectError("refused"))
+    ready = respx.get(f"{BASE}/ready")
+    h = await epicmail.read_health(client, RESOLVED, timeout=2.0)
+    assert not h.ok
+    assert ready.call_count == 0
+
+
+# -------------------------------------------------------------------------- poller
+
+
+def _relay(db: Database, slug: str = "epicbox.btlabs.uk") -> Target:
+    t = Target(
+        kind=Kind.EPICBOX,
+        slug=slug,
+        endpoint=f"wss://{slug}:443/",
+        display_host=slug,
+        source=Source.SEED,
+    )
+    t.id = db.insert_target(t)
+    return t
+
+
+@pytest.fixture
+async def poller(db: Database, settings: Settings) -> AsyncIterator[Poller]:
+    p = Poller(db, settings)
+    p._client = build_client(timeout=2.0)
+
+    async def fixed(_: str) -> Resolved:
+        return RESOLVED
+
+    p._resolve = fixed  # type: ignore[method-assign]
+    try:
+        yield p
+    finally:
+        await p._client.aclose()
+
+
+def _ok(version: str = "3.1.0") -> EpicboxProbe:
+    return EpicboxProbe(ok=True, latency_ms=50, challenge_seen=True, protocol_version=version)
+
+
+def _mock_epicmail() -> tuple[respx.Route, respx.Route]:
+    wk = respx.get(f"{BASE}/.well-known/epicbox.json").mock(
+        return_value=httpx.Response(200, content=raw("well-known.json"))
+    )
+    respx.get(f"{BASE}/v1/info").mock(return_value=httpx.Response(200, content=raw("v1-info.json")))
+    st = respx.get(f"{BASE}/status.json").mock(
+        return_value=httpx.Response(200, content=raw("status.json"))
+    )
+    return wk, st
+
+
+@respx.mock
+async def test_poller_detects_once_then_reads_status_on_its_cadence(
+    db: Database, poller: Poller
+) -> None:
+    relay = _relay(db)
+    wk, st = _mock_epicmail()
+    probes = {relay.slug: _ok()}
+    cadence = poller.settings.cadence
+
+    await poller._refresh_relay_software([relay], probes, 1000.0)
+    assert wk.call_count == 1 and st.call_count == 1
+    assert relay.id is not None
+    status = poller._relay_status(relay, probes[relay.slug])
+    assert status.is_epicmail
+    assert status.relay_health is not None and status.relay_health.messages_waiting == 159
+
+    # A sweep later: nothing is due.
+    await poller._refresh_relay_software([relay], probes, 1030.0)
+    assert wk.call_count == 1 and st.call_count == 1
+
+    # Counters on their own cadence, the info document on its slower one.
+    await poller._refresh_relay_software([relay], probes, 1000.0 + cadence.epicmail_status_s)
+    assert wk.call_count == 1 and st.call_count == 2
+    await poller._refresh_relay_software([relay], probes, 1000.0 + cadence.epicmail_info_s)
+    assert wk.call_count == 2
+
+    # Kept in the database, so a restart shows the badge before the first round.
+    (info, checked_at) = db.relay_infos()[relay.id]
+    assert info is not None and info.is_epicmail and checked_at is not None
+
+
+@respx.mock
+async def test_poller_classic_relay_is_asked_rarely_and_never_for_counters(
+    db: Database, poller: Poller
+) -> None:
+    relay = _relay(db, "epicbox.epiccash.com")
+    wk = respx.get(f"{BASE}/.well-known/epicbox.json").mock(
+        return_value=httpx.Response(200, content=raw("classic-any-path.html"))
+    )
+    st = respx.get(f"{BASE}/status.json")
+    probes = {relay.slug: _ok("3.0.0")}
+
+    for now in (1000.0, 1030.0, 1000.0 + 86400.0, 1000.0 + 6 * 86400.0):
+        await poller._refresh_relay_software([relay], probes, now)
+    assert wk.call_count == 1
+    assert st.call_count == 0
+    assert not poller._relay_status(relay, probes[relay.slug]).is_epicmail
+
+    await poller._refresh_relay_software(
+        [relay], probes, 1000.0 + poller.settings.cadence.relay_detect_s
+    )
+    assert wk.call_count == 2
+
+
+@respx.mock
+async def test_poller_redetects_when_getversion_changes(db: Database, poller: Poller) -> None:
+    """A relay switched from the classic software to Epicmail answers GetVersion with
+    3.1.0 instead of 3.0.0, which is the cue to look again rather than wait a week."""
+    relay = _relay(db)
+    wk = respx.get(f"{BASE}/.well-known/epicbox.json").mock(
+        side_effect=[
+            httpx.Response(200, content=raw("classic-any-path.html")),
+            httpx.Response(200, content=raw("well-known.json")),
+        ]
+    )
+    respx.get(f"{BASE}/v1/info").mock(return_value=httpx.Response(200, content=raw("v1-info.json")))
+    respx.get(f"{BASE}/status.json").mock(return_value=httpx.Response(200, content=raw("status.json")))
+
+    await poller._refresh_relay_software([relay], {relay.slug: _ok("3.0.0")}, 1000.0)
+    await poller._refresh_relay_software([relay], {relay.slug: _ok("3.0.0")}, 1030.0)
+    assert wk.call_count == 1
+    await poller._refresh_relay_software([relay], {relay.slug: _ok("3.1.0")}, 1060.0)
+    assert wk.call_count == 2
+    assert poller._relay_status(relay, _ok()).is_epicmail
+
+
+@respx.mock
+async def test_poller_keeps_the_badge_through_a_timeout(db: Database, poller: Poller) -> None:
+    relay = _relay(db)
+    respx.get(f"{BASE}/.well-known/epicbox.json").mock(
+        side_effect=[
+            httpx.Response(200, content=raw("well-known.json")),
+            httpx.ConnectTimeout("slow"),
+        ]
+    )
+    respx.get(f"{BASE}/v1/info").mock(return_value=httpx.Response(200, content=raw("v1-info.json")))
+    respx.get(f"{BASE}/status.json").mock(return_value=httpx.Response(200, content=raw("status.json")))
+    await poller._refresh_relay_software([relay], {relay.slug: _ok()}, 1000.0)
+    await poller._refresh_relay_software(
+        [relay], {relay.slug: _ok()}, 1000.0 + poller.settings.cadence.epicmail_info_s
+    )
+    assert poller._relay_status(relay, _ok()).is_epicmail
+
+
+@respx.mock
+async def test_poller_does_not_ask_a_relay_that_is_down(db: Database, poller: Poller) -> None:
+    relay = _relay(db)
+    wk = respx.get(f"{BASE}/.well-known/epicbox.json")
+    down = EpicboxProbe(ok=False, reason=Reason.TIMEOUT, error="timed out")
+    await poller._refresh_relay_software([relay], {relay.slug: down}, 1000.0)
+    assert wk.call_count == 0
+
+
+@respx.mock
+async def test_restart_loads_detection_from_the_database(
+    db: Database, settings: Settings, poller: Poller
+) -> None:
+    relay = _relay(db)
+    _mock_epicmail()
+    await poller._refresh_relay_software([relay], {relay.slug: _ok()}, 1000.0)
+
+    fresh = Poller(db, settings)
+    fresh._client = poller._client
+    fresh._resolve = poller._resolve  # type: ignore[method-assign]
+    wk = respx.get(f"{BASE}/.well-known/epicbox.json")
+    before = wk.call_count
+    await fresh._refresh_relay_software([relay], {relay.slug: _ok()}, 5.0)
+    # Known as Epicmail at once, and not asked again until its six hours are up.
+    assert wk.call_count == before
+    assert fresh._relay_status(relay, _ok()).is_epicmail
+
+
+@respx.mock
+async def test_a_relay_reporting_its_store_failing_is_degraded(
+    db: Database, poller: Poller
+) -> None:
+    relay = _relay(db)
+    respx.get(f"{BASE}/.well-known/epicbox.json").mock(
+        return_value=httpx.Response(200, content=raw("well-known.json"))
+    )
+    respx.get(f"{BASE}/v1/info").mock(return_value=httpx.Response(200, content=raw("v1-info.json")))
+    respx.get(f"{BASE}/status.json").mock(
+        return_value=httpx.Response(200, json=doc("status.json") | {"store_ok": False})
+    )
+    await poller._refresh_relay_software([relay], {relay.slug: _ok()}, 1000.0)
+    status = poller._relay_status(relay, _ok())
+    assert status.state is State.DEGRADED
+    assert status.reason is Reason.BAD_RESPONSE
+    assert status.detail == "relay reports its message store is failing"
+
+
+# ----------------------------------------------------------------------------- API
+
+
+def _status(epicmail_relay: bool) -> TargetStatus:
+    t = Target(
+        kind=Kind.EPICBOX,
+        slug="relay.example",
+        endpoint="wss://relay.example:443/",
+        display_host="relay.example",
+        source=Source.SEED,
+    )
+    s = TargetStatus(target=t, state=State.HEALTHY, protocol_version="3.1.0")
+    if epicmail_relay:
+        s.relay_info = parse_well_known(doc("well-known.json"))
+        s.relay_health = parse_status(doc("status.json"))
+    return s
+
+
+def test_api_row_adds_fields_and_keeps_the_old_ones() -> None:
+    from epic_status.api import _serialise_target
+
+    classic = _serialise_target(_status(False))
+    em = _serialise_target(_status(True))
+    # Every field a classic row had is still there, with the same meaning.
+    assert set(classic) <= set(em)
+    for key in ("protocol_version", "cert_expires_in_days", "ipv6", "state", "endpoint"):
+        assert key in em
+    assert classic["software"] is None and classic["epicmail"] is None
+    assert em["software"] == "epicmail"
+    detail = em["epicmail"]
+    assert detail["version"] == "0.1.1"
+    assert detail["cancel"] is True and detail["mux"] is True
+    assert detail["https_api"] == {"protocol": "epicbox-https/0.1", "ok": None}
+    assert detail["health"]["messages_waiting"] == 159
+    assert detail["health"]["ready"] is True
+
+
+def test_api_epicmail_detail_matches_its_documented_schema() -> None:
+    from epic_status import schemas
+    from epic_status.api import epicmail_detail
+
+    detail = epicmail_detail(_status(True))
+    assert detail is not None
+    model = schemas.EpicmailDetail.model_validate(detail)
+    assert set(detail) == set(schemas.EpicmailDetail.model_fields)
+    assert model.health is not None
+    assert set(detail["health"]) == set(schemas.EpicmailHealth.model_fields)
+
+
+def test_board_shows_the_badge_the_pitch_and_the_panel() -> None:
+    from datetime import UTC, datetime
+
+    from epic_status.models import NetworkSummary, Snapshot
+    from epic_status.render import render_board, render_submit
+
+    em, classic = _status(True), _status(False)
+    classic.target = classic.target.model_copy(update={"slug": "old.example", "display_host": "old.example"})
+    snap = Snapshot(
+        generated_at=datetime.now(UTC),
+        prober_id="test",
+        network=NetworkSummary(epicbox_total=2, epicbox_healthy=2),
+        nodes=[],
+        epicbox=[em, classic],
+        pools=[],
+    )
+    html = render_board(snapshot=snap, settings=Settings())
+    assert html.count('class="em-badge"') == 1
+    assert "Epicmail is the recommended relay." in html
+    assert "1 of 2 relays here run it." in html
+    assert "tools/get.sh | sh -s -- --domain relay.example.org" in html
+    assert "https://github.com/BTLabsUK/epicmail" in html
+    assert 'class="d-em"' in html
+    assert "waiting messages" in html and "159" in html
+    assert "with cancel" in html
+    # Counts only on the page, too.
+    assert "epicmail.btlabs.uk:443" not in html
+
+    form = render_submit(snapshot=snap, settings=Settings())
+    assert 'value="epicmail"' in form and 'value="epicbox"' in form
+
+
+def test_health_of_a_non_epicmail_relay_is_not_published() -> None:
+    from epic_status.api import epicmail_detail
+
+    s = _status(False)
+    s.relay_health = RelayHealth(ok=True, sockets=3)
+    assert epicmail_detail(s) is None

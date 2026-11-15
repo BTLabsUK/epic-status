@@ -37,6 +37,7 @@ from .models import (
     EventKind,
     GeoInfo,
     Kind,
+    RelayInfo,
     Severity,
     Source,
     State,
@@ -127,6 +128,12 @@ CREATE TABLE IF NOT EXISTS targets (
     -- Slow-changing facts, refreshed on their own cadences.
     node_version      TEXT,
     protocol_version  TEXT,
+    -- Relays only: the relay's own `/.well-known/epicbox.json`, parsed to a RelayInfo,
+    -- when it publishes one (Epicmail does, the classic relay does not), and when that
+    -- document was last asked for. Kept so a restart shows the Epicmail badge at once
+    -- instead of after the first detection round.
+    relay_info_json   TEXT,
+    relay_checked_at  TEXT,
     cert_expires_at   TEXT,
     geo_json          TEXT,
     geo_looked_up_at  TEXT,
@@ -936,6 +943,36 @@ class Database:
         self.conn.execute(
             "UPDATE targets SET protocol_version = ? WHERE id = ?", (version, target_id)
         )
+
+    def set_relay_info(self, target_id: int, info: RelayInfo | None) -> None:
+        """Record a detection answer: the relay's info document, or None for a relay
+        that does not publish one."""
+        self.conn.execute(
+            "UPDATE targets SET relay_info_json = ?, relay_checked_at = ? WHERE id = ?",
+            (
+                None if info is None else info.model_dump_json(),
+                _iso(_now()),
+                target_id,
+            ),
+        )
+
+    def relay_infos(self) -> dict[int, tuple[RelayInfo | None, datetime | None]]:
+        """Every relay's last detection: `{target_id: (info, checked_at)}`. Relays never
+        checked are absent. An unreadable stored document reads as never checked."""
+        out: dict[int, tuple[RelayInfo | None, datetime | None]] = {}
+        for row in self.conn.execute(
+            "SELECT id, relay_info_json, relay_checked_at FROM targets "
+            "WHERE kind = ? AND relay_checked_at IS NOT NULL",
+            (Kind.EPICBOX.value,),
+        ):
+            info: RelayInfo | None = None
+            if row["relay_info_json"]:
+                try:
+                    info = RelayInfo.model_validate_json(row["relay_info_json"])
+                except ValueError:
+                    continue
+            out[int(row["id"])] = (info, parse_iso(row["relay_checked_at"]))
+        return out
 
     def set_cert_expiry(self, target_id: int, expires_at: datetime | None) -> None:
         self.conn.execute(

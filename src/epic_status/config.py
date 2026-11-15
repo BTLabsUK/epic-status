@@ -41,6 +41,19 @@ class Cadence(BaseModel):
     node_p2p_s: float = 30.0
     epicbox_s: float = 30.0
     epicbox_cert_s: float = 21600.0
+    epicmail_status_s: float = 120.0
+    """`/status.json` on a relay detected as Epicmail: one small GET every two minutes,
+    a quarter of the handshake's rate. Its counters move slowly and the handshake stays
+    the liveness check, so nothing is gained by matching the 30 seconds."""
+    epicmail_info_s: float = 21600.0
+    """`/.well-known/epicbox.json` (and `/v1/info`) on a relay detected as Epicmail, to
+    follow upgrades and feature switches."""
+    relay_detect_s: float = 604800.0
+    """The same document on a relay that did not describe itself: once a week. The
+    classic relay answers it with its status page, which fans out to other relays, so
+    this stays rare. A relay is also checked when first seen and whenever its
+    websocket `GetVersion` answer changes, which is what a software switch looks like."""
+    epicmail_timeout_s: float = 5.0
     pool_s: float = 30.0
     """Pools are third-party web apps, not protocol daemons: a stats endpoint is
     usually a database aggregate behind a framework, and one of the two measured

@@ -182,6 +182,85 @@ class EpicboxProbe(BaseModel):
     error: str | None = None
 
 
+EPICMAIL = "epicmail"
+"""The `software` value an Epicmail relay publishes in `/.well-known/epicbox.json`."""
+
+
+class RelayInfo(BaseModel):
+    """What a relay says about itself in `/.well-known/epicbox.json`, read on a slow
+    cadence. Only relays that publish the document have one; the classic relay does not.
+
+    Kept to the facts a reader choosing a relay can act on. The document's per-feature
+    limits are left out: they are tuning numbers for client authors, who read them from
+    the relay itself."""
+
+    software: str
+    version: str | None = None
+    protocol_versions: list[str] = Field(default_factory=list)
+    federation: bool | None = None
+    mux: bool = False
+    """`mux/1`: many mailboxes on one socket."""
+    https_protocol: str | None = None
+    """The HTTPS pull API's protocol name, when the relay offers one."""
+    https_ok: bool | None = None
+    """Whether `/v1/info` answered with the same protocol. None when not checked."""
+    checked_at: datetime | None = None
+
+    @property
+    def is_epicmail(self) -> bool:
+        return self.software == EPICMAIL
+
+    @property
+    def cancel(self) -> bool:
+        """Protocol 3.1.0 is the one that adds transaction cancel."""
+        return "3.1.0" in self.protocol_versions
+
+
+class RelayHealth(BaseModel):
+    """Aggregate counters an Epicmail relay publishes at `/status.json`.
+
+    Counts only. The document has no addresses, keys or client IPs, and the fields
+    copied here are an allow-list, so a future field that did carry one would not be
+    republished by accident."""
+
+    ok: bool
+    """The endpoint answered with a usable document."""
+    source: str = "status.json"
+    """`status.json`, or `ready` when only `/ready` answered."""
+    version: str | None = None
+    uptime_s: int | None = None
+    draining: bool | None = None
+    store_ok: bool | None = None
+    sockets: int | None = None
+    listening_mailboxes: int | None = None
+    classic_subscriptions: int | None = None
+    mux_holders: int | None = None
+    messages_waiting: int | None = None
+    forwards_waiting: int | None = None
+    forward_peers: int | None = None
+    error: str | None = None
+    checked_at: datetime | None = None
+
+    @property
+    def ready(self) -> bool | None:
+        """Accepting and storing mail: not restarting, and the store's last write
+        check passed. None when the document did not say."""
+        if self.draining is None and self.store_ok is None:
+            return None
+        return not self.draining and self.store_ok is not False
+
+    @property
+    def fault(self) -> str | None:
+        """A sentence when the relay reports itself unable to take mail, else None."""
+        if not self.ok:
+            return None
+        if self.draining:
+            return "relay reports it is restarting"
+        if self.store_ok is False:
+            return "relay reports its message store is failing"
+        return None
+
+
 class PoolProbe(BaseModel):
     """Result of one GET against one pool's stats API.
 
@@ -662,6 +741,21 @@ class TargetStatus(BaseModel):
         if not self.status_closed or self.height is None or self.tip_lag is None:
             return None
         return "at tip" if self.tip_lag <= 0 else f"{self.tip_lag:,} behind"
+
+    relay_info: RelayInfo | None = None
+    """Relays only: the relay's own `/.well-known/epicbox.json`, when it publishes one."""
+    relay_health: RelayHealth | None = None
+    """Relays only: the latest `/status.json` read, for a relay detected as Epicmail."""
+
+    @property
+    def software(self) -> str | None:
+        """Relays only: `epicmail`, another self-described relay, or None for the
+        classic relay, which publishes no info document."""
+        return self.relay_info.software if self.relay_info is not None else None
+
+    @property
+    def is_epicmail(self) -> bool:
+        return self.relay_info is not None and self.relay_info.is_epicmail
 
     tip_agrees: bool | None = None
     """Nodes only: whether this node's tip hash matches the most common hash among

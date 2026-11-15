@@ -45,6 +45,8 @@ from .models import (
     StatusSource,
     PoolProbe,
     Reason,
+    RelayHealth,
+    RelayInfo,
     Snapshot,
     State,
     Target,
@@ -59,6 +61,7 @@ from .net import (
     resolve_endpoint,
     tcp_probe,
 )
+from .probes import epicmail
 from .probes.epicbox import probe_relay
 from .probes.node import (
     probe_cors,
@@ -157,6 +160,17 @@ class Poller:
         self._cert_days: dict[int, int | None] = {}
         self._last_epicbox: dict[int, tuple[float, EpicboxProbe]] = {}
         self._relay_persisted: dict[int, float] = {}
+        # Relay software (Epicmail detection) and Epicmail's own counters. `_relay_info`
+        # holds the last definite answer per relay: an info document, or None for one
+        # that publishes none. A transport failure leaves it as it was, so one timeout
+        # never takes a badge away. Loaded from the database on the first round.
+        self._relay_info: dict[int, RelayInfo | None] = {}
+        self._relay_info_loaded = False
+        self._next_detect: dict[int, float] = {}
+        self._relay_seen_version: dict[int, str] = {}
+        self._relay_health: dict[int, tuple[float, RelayHealth]] = {}
+        self._next_relay_health: dict[int, float] = {}
+        self._relay_extra_inflight: set[int] = set()
         self._next_pool: dict[int, float] = {}
         self._last_pool: dict[int, tuple[float, PoolProbe]] = {}
         self._pool_persisted: dict[int, float] = {}
@@ -256,6 +270,7 @@ class Poller:
         self._spawn(self._refresh_status(nodes, now))
         self._spawn(self._refresh_p2p(nodes, node_probes, now))
         self._spawn(self._refresh_certs(relays, now))
+        self._spawn(self._refresh_relay_software(relays, relay_probes, now))
         self._spawn(self._refresh_geo(targets, now))
         self._spawn(self._refresh_capabilities(nodes + relays, now))
 
@@ -725,6 +740,120 @@ class Poller:
         if days is not None:
             self.db.set_cert_expiry(target.id, datetime.now(UTC) + timedelta(days=days))
 
+    async def _refresh_relay_software(
+        self, relays: list[Target], probes: dict[str, EpicboxProbe], now: float
+    ) -> None:
+        """Epicmail detection, and the counters an Epicmail relay publishes.
+
+        Detection reads `/.well-known/epicbox.json` when a relay is first seen, when its
+        `GetVersion` answer changes, and otherwise on `relay_detect_s` (a week) — or on
+        `epicmail_info_s` for a relay already known to be Epicmail, to follow upgrades.
+        The rarity is for the classic relay, which answers that path with a status page
+        that fans out to other relays. See `probes.epicmail`.
+
+        Only a relay whose handshake just succeeded is asked to describe itself: a relay
+        that is down cannot answer, and asking would only turn its outage into a lost
+        badge.
+        """
+        if not self._relay_info_loaded:
+            self._relay_info_loaded = True
+            wall = datetime.now(UTC)
+            for target_id, (info, checked_at) in self.db.relay_infos().items():
+                self._relay_info[target_id] = info
+                cadence = (
+                    self.settings.cadence.epicmail_info_s
+                    if info is not None and info.is_epicmail
+                    else self.settings.cadence.relay_detect_s
+                )
+                age = (wall - checked_at).total_seconds() if checked_at else cadence
+                self._next_detect[target_id] = now + max(0.0, cadence - age)
+        await asyncio.gather(
+            *(
+                self._one_relay_software(t, probes.get(t.slug), now)
+                for t in relays
+                if t.id is not None and t.id not in self._relay_extra_inflight
+            )
+        )
+
+    async def _one_relay_software(
+        self, target: Target, probe: EpicboxProbe | None, now: float
+    ) -> None:
+        assert target.id is not None
+        tid = target.id
+        cadence = self.settings.cadence
+        timeout = cadence.epicmail_timeout_s
+
+        version = probe.protocol_version if probe is not None else None
+        previous = self._relay_seen_version.get(tid)
+        if version:
+            self._relay_seen_version[tid] = version
+        switched = previous is not None and version is not None and version != previous
+
+        info = self._relay_info.get(tid)
+        detect_due = (
+            probe is not None
+            and probe.ok
+            and (switched or now >= self._next_detect.get(tid, 0.0))
+        )
+        health_due = (
+            info is not None
+            and info.is_epicmail
+            and now >= self._next_relay_health.get(tid, 0.0)
+        )
+        if not (detect_due or health_due):
+            return
+
+        self._relay_extra_inflight.add(tid)
+        try:
+            resolved = await self._resolve(target.endpoint)
+            if isinstance(resolved, TargetRejected):
+                return
+            assert self._client is not None
+            if detect_due:
+                async with self._sem:
+                    answered, found = await epicmail.detect(
+                        self._client, resolved, timeout=timeout
+                    )
+                if answered:
+                    before = info.software if info is not None else None
+                    after = found.software if found is not None else None
+                    if before != after or tid not in self._relay_info:
+                        log.info(
+                            "relay %s software: %s",
+                            target.slug,
+                            after or "not self-described",
+                        )
+                    info = found
+                    self._relay_info[tid] = found
+                    self.db.set_relay_info(tid, found)
+                self._next_detect[tid] = now + (
+                    cadence.epicmail_info_s
+                    if info is not None and info.is_epicmail
+                    else cadence.relay_detect_s
+                )
+            if info is None or not info.is_epicmail:
+                self._relay_health.pop(tid, None)
+                return
+            if now < self._next_relay_health.get(tid, 0.0):
+                return
+            self._next_relay_health[tid] = now + cadence.epicmail_status_s
+            async with self._sem:
+                health = await epicmail.read_health(self._client, resolved, timeout=timeout)
+            self._relay_health[tid] = (asyncio.get_running_loop().time(), health)
+        finally:
+            self._relay_extra_inflight.discard(tid)
+
+    def _fresh_relay_health(self, target_id: int) -> RelayHealth | None:
+        """The latest counters, or None once they are too old to describe the relay
+        now (two reads missed in a row)."""
+        cached = self._relay_health.get(target_id)
+        if cached is None:
+            return None
+        age = asyncio.get_running_loop().time() - cached[0]
+        if age > self.settings.cadence.epicmail_status_s * 2.5:
+            return None
+        return cached[1]
+
     async def _refresh_capabilities(self, targets: list[Target], now: float) -> None:
         """IPv6 reachability for nodes and relays, and browser access for nodes.
 
@@ -879,6 +1008,17 @@ class Poller:
             consecutive_failures=failures,
             thresholds=self.settings.thresholds,
         )
+        info = self._relay_info.get(target.id)
+        health = (
+            self._fresh_relay_health(target.id)
+            if info is not None and info.is_epicmail
+            else None
+        )
+        # An Epicmail relay that completes the handshake but reports that it cannot take
+        # mail (restarting, or its store failing a write) is up but not usable, which is
+        # what the degraded bucket is for. The handshake alone cannot see it.
+        if state is State.HEALTHY and health is not None and health.fault:
+            state, reason, detail = State.DEGRADED, Reason.BAD_RESPONSE, health.fault
 
         status = TargetStatus(
             target=target,
@@ -889,6 +1029,8 @@ class Poller:
             protocol_version=probe.protocol_version or row["protocol_version"],
             cert_expires_in_days=cert_days,
             ipv6=self._ipv6.get(target.id),
+            relay_info=info,
+            relay_health=health,
             last_checked_at=datetime.now(UTC),
             last_ok_at=datetime.now(UTC) if probe.ok else parse_iso(row["last_ok_at"]),
             last_error=None if probe.ok else (probe.error or row["last_error"]),

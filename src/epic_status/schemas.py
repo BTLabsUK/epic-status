@@ -233,11 +233,73 @@ class NodeStatus(TargetBase):
     )
 
 
+class EpicmailHttpsApi(BaseModel):
+    protocol: str = Field(examples=["epicbox-https/0.1"])
+    ok: bool | None = Field(
+        None, description="Whether `/v1/info` answered with this protocol. Null if not checked."
+    )
+
+
+class EpicmailHealth(BaseModel):
+    """The relay's own `/status.json` (or `/ready` when that is missing), read every
+    two minutes. Aggregate counts only."""
+
+    ok: bool = Field(description="The relay answered with a usable document.")
+    source: str = Field(examples=["status.json"], description="`status.json` or `ready`.")
+    ready: bool | None = Field(
+        None, description="Not restarting and the message store's last write check passed."
+    )
+    draining: bool | None = None
+    store_ok: bool | None = None
+    version: str | None = Field(None, examples=["0.1.1"])
+    uptime_s: int | None = Field(None, examples=[2731], description="Since the relay process started.")
+    sockets: int | None = Field(None, examples=[8], description="Open websockets.")
+    listening_mailboxes: int | None = Field(None, examples=[8])
+    classic_subscriptions: int | None = Field(None, examples=[8])
+    mux_holders: int | None = Field(None, examples=[0])
+    messages_waiting: int | None = Field(
+        None, examples=[159], description="Slates stored and not yet collected."
+    )
+    forwards_waiting: int | None = Field(
+        None, examples=[0], description="Forward queue to other relays."
+    )
+    forward_peers: int | None = Field(None, examples=[0])
+    error: str | None = None
+    checked_at: str | None = None
+
+
+class EpicmailDetail(BaseModel):
+    """From the relay's `/.well-known/epicbox.json` (read every six hours) and its
+    counters."""
+
+    version: str | None = Field(None, examples=["0.1.1"])
+    protocol_versions: list[str] = Field(
+        default_factory=list, examples=[["2.0.0", "3.0.0", "3.1.0"]]
+    )
+    cancel: bool = Field(False, description="Speaks 3.1.0, which adds transaction cancel.")
+    mux: bool = Field(False, description="Offers `mux/1`: many mailboxes on one socket.")
+    https_api: EpicmailHttpsApi | None = Field(
+        None, description="The HTTPS pull API, when the relay offers it."
+    )
+    federation: bool | None = None
+    info_checked_at: str | None = None
+    health: EpicmailHealth | None = None
+
+
 class EpicboxStatus(TargetBase):
     protocol_version: str | None = Field(None, examples=["3.0.1"])
     cert_expires_in_days: int | None = Field(None, examples=[61])
     ipv6: str | None = Field(
         None, description="As for nodes: `yes`, `unreachable` or `absent`."
+    )
+    software: str | None = Field(
+        None,
+        examples=["epicmail"],
+        description="What the relay calls itself in `/.well-known/epicbox.json`. Null for "
+        "the classic relay, which publishes no such document.",
+    )
+    epicmail: EpicmailDetail | None = Field(
+        None, description="Present when the relay is Epicmail; null otherwise."
     )
 
 
@@ -500,6 +562,11 @@ class EpicboxList(BaseModel):
     generated_at: str
     epicbox: list[str] = Field(
         default_factory=list, examples=[["epicbox.epiccash.com", "epicbox.epicnet.us"]]
+    )
+    epicmail: list[str] = Field(
+        default_factory=list,
+        examples=[["epicbox.btlabs.uk"]],
+        description="The hosts in `epicbox` that run Epicmail, in the same order.",
     )
 
 
