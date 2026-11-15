@@ -70,7 +70,7 @@ API. The board recommends it, marks the relays that run it, and reads more about
 
 Cadences are `EPIC_STATUS_CADENCE__EPICMAIL_STATUS_S`, `EPIC_STATUS_CADENCE__EPICMAIL_INFO_S`,
 `EPIC_STATUS_CADENCE__RELAY_DETECT_S` and `EPIC_STATUS_CADENCE__EPICMAIL_TIMEOUT_S`. By hand:
-`uv run epic-status check wss://epicbox.example.org` prints what the board would see.
+`uv run epic-status check --kind epicbox epicbox.example.org` prints what the board would see.
 
 ## Configuration extras
 
