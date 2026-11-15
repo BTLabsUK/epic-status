@@ -133,34 +133,21 @@ def test_status_from_the_live_relay() -> None:
     assert h.ok
     assert h.source == "status.json"
     assert h.version == "0.1.1"
-    assert h.uptime_s == 2731
     assert h.draining is False
     assert h.store_ok is True
     assert h.ready is True
     assert h.fault is None
-    assert h.sockets == 8
-    assert h.listening_mailboxes == 8
-    assert h.classic_subscriptions == 8
-    assert h.mux_holders == 0
-    assert h.messages_waiting == 159
-    assert h.forwards_waiting == 0
-    assert h.forward_peers == 0
 
 
-def test_status_copies_counts_only() -> None:
-    """An allow-list: the relay's name and identity, store byte sizes, and a field a
-    future version might add are not republished."""
+def test_status_copies_readiness_only() -> None:
+    """No traffic counts (sockets, mailboxes, waiting messages, forward queue, uptime),
+    no name or identity, and nothing a future version might add."""
     payload = doc("status.json") | {"addresses": ["esWD...@relay"], "client_ips": ["198.51.100.1"]}
     dumped = parse_status(payload).model_dump()
+    assert set(dumped) == {"ok", "source", "version", "draining", "store_ok", "error", "checked_at"}
     text = json.dumps(dumped, default=str)
-    for leaked in ("esWD", "198.51.100.1", "epicmail.btlabs.uk", "db_bytes", "82173952"):
+    for leaked in ("esWD", "198.51.100.1", "epicmail.btlabs.uk", "159", "2731", "82173952"):
         assert leaked not in text
-
-
-@pytest.mark.parametrize("bad", [-1, True, "8", 1.5, None])
-def test_status_counts_must_be_non_negative_integers(bad: Any) -> None:
-    h = parse_status(doc("status.json") | {"sockets": bad})
-    assert h.sockets is None
 
 
 def test_status_that_is_not_an_object_is_not_ok() -> None:
@@ -300,7 +287,7 @@ async def test_health_reads_status_json(client: httpx.AsyncClient) -> None:
     )
     ready = respx.get(f"{BASE}/ready")
     h = await epicmail.read_health(client, RESOLVED, timeout=2.0)
-    assert h.ok and h.messages_waiting == 159
+    assert h.ok and h.ready is True
     assert status.call_count == 1
     assert ready.call_count == 0
 
@@ -384,7 +371,7 @@ async def test_poller_detects_once_then_reads_status_on_its_cadence(
     assert relay.id is not None
     status = poller._relay_status(relay, probes[relay.slug])
     assert status.is_epicmail
-    assert status.relay_health is not None and status.relay_health.messages_waiting == 159
+    assert status.relay_health is not None and status.relay_health.ready is True
 
     # A sweep later: nothing is due.
     await poller._refresh_relay_software([relay], probes, 1030.0)
@@ -544,7 +531,8 @@ def test_api_row_adds_fields_and_keeps_the_old_ones() -> None:
     assert detail["version"] == "0.1.1"
     assert detail["cancel"] is True and detail["mux"] is True
     assert detail["https_api"] == {"protocol": "epicbox-https/0.1", "ok": None}
-    assert detail["health"]["messages_waiting"] == 159
+    assert "messages_waiting" not in detail["health"]
+    assert "sockets" not in detail["health"]
     assert detail["health"]["ready"] is True
 
 
@@ -583,7 +571,10 @@ def test_board_shows_the_badge_the_pitch_and_the_panel() -> None:
     assert "tools/get.sh | sh -s -- --domain relay.example.org" in html
     assert "https://github.com/BTLabsUK/epicmail" in html
     assert 'class="d-em"' in html
-    assert "waiting messages" in html and "159" in html
+    assert "message store" in html
+    for gone in ("waiting messages", "forward queue", "open sockets",
+                 "listening mailboxes", "relay uptime", "counters read"):
+        assert gone not in html
     assert "with cancel" in html
     # Counts only on the page, too.
     assert "epicmail.btlabs.uk:443" not in html
@@ -596,5 +587,5 @@ def test_health_of_a_non_epicmail_relay_is_not_published() -> None:
     from epic_status.api import epicmail_detail
 
     s = _status(False)
-    s.relay_health = RelayHealth(ok=True, sockets=3)
+    s.relay_health = RelayHealth(ok=True, store_ok=True)
     assert epicmail_detail(s) is None

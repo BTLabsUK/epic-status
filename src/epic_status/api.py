@@ -1445,9 +1445,8 @@ def _serialise(
 
 def epicmail_detail(status: TargetStatus) -> dict[str, Any] | None:
     """The `epicmail` object on a relay row: what the relay publishes about itself and
-    its latest counters. Null for a relay not detected as Epicmail. Counts only — the
-    relay's documents carry no addresses or client IPs, and only these fields are
-    copied from them."""
+    whether it can take mail. Null for a relay not detected as Epicmail. No traffic
+    counts: the relay publishes some, and they are deliberately not republished."""
     info = status.relay_info
     if info is None or not info.is_epicmail:
         return None
@@ -1474,14 +1473,6 @@ def epicmail_detail(status: TargetStatus) -> dict[str, Any] | None:
                 "draining": health.draining,
                 "store_ok": health.store_ok,
                 "version": health.version,
-                "uptime_s": health.uptime_s,
-                "sockets": health.sockets,
-                "listening_mailboxes": health.listening_mailboxes,
-                "classic_subscriptions": health.classic_subscriptions,
-                "mux_holders": health.mux_holders,
-                "messages_waiting": health.messages_waiting,
-                "forwards_waiting": health.forwards_waiting,
-                "forward_peers": health.forward_peers,
                 "error": health.error,
                 "checked_at": stamp(health.checked_at),
             }

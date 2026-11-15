@@ -241,8 +241,8 @@ class EpicmailHttpsApi(BaseModel):
 
 
 class EpicmailHealth(BaseModel):
-    """The relay's own `/status.json` (or `/ready` when that is missing), read every
-    two minutes. Aggregate counts only."""
+    """Readiness from the relay's own `/status.json` (or `/ready` when that is missing),
+    read every two minutes. No traffic counts."""
 
     ok: bool = Field(description="The relay answered with a usable document.")
     source: str = Field(examples=["status.json"], description="`status.json` or `ready`.")
@@ -252,25 +252,13 @@ class EpicmailHealth(BaseModel):
     draining: bool | None = None
     store_ok: bool | None = None
     version: str | None = Field(None, examples=["0.1.1"])
-    uptime_s: int | None = Field(None, examples=[2731], description="Since the relay process started.")
-    sockets: int | None = Field(None, examples=[8], description="Open websockets.")
-    listening_mailboxes: int | None = Field(None, examples=[8])
-    classic_subscriptions: int | None = Field(None, examples=[8])
-    mux_holders: int | None = Field(None, examples=[0])
-    messages_waiting: int | None = Field(
-        None, examples=[159], description="Slates stored and not yet collected."
-    )
-    forwards_waiting: int | None = Field(
-        None, examples=[0], description="Forward queue to other relays."
-    )
-    forward_peers: int | None = Field(None, examples=[0])
     error: str | None = None
     checked_at: str | None = None
 
 
 class EpicmailDetail(BaseModel):
     """From the relay's `/.well-known/epicbox.json` (read every six hours) and its
-    counters."""
+    readiness."""
 
     version: str | None = Field(None, examples=["0.1.1"])
     protocol_versions: list[str] = Field(

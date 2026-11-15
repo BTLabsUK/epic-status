@@ -65,9 +65,10 @@
 {%- endmacro %}
 
 {#
-  The Epicmail part of a relay's panel: what the relay publishes about itself and its own
-  counters, which the handshake cannot see. Counts only. Shown under the shared facts so the
-  endpoint, location and uptime stay where they are for every relay.
+  The Epicmail part of a relay's panel: what the relay publishes about itself, and whether its
+  message store is working, which the handshake cannot see. No traffic figures: waiting
+  messages, sockets and mailboxes say how a relay is used, and are not shown. Shown under the
+  shared facts so the endpoint, location and uptime stay where they are for every relay.
 #}
 {% macro epicmail_facts(status) %}
 {% set info = status.relay_info %}
@@ -99,47 +100,6 @@
       <dd>{% if h.draining %}restarting{% elif h.store_ok is false %}<span class="d-bad">failing</span>{% else %}OK{% endif %}</dd>
     </div>
     {% endif %}
-    {% if h.messages_waiting is not none %}
-    <div>
-      <dt>waiting messages</dt>
-      <dd>{{ h.messages_waiting | thousands }}</dd>
-    </div>
-    {% endif %}
-    {% if h.forwards_waiting is not none %}
-    <div>
-      <dt>forward queue</dt>
-      <dd>{{ h.forwards_waiting | thousands }}</dd>
-    </div>
-    {% endif %}
-    {% if h.sockets is not none %}
-    <div>
-      <dt>open sockets</dt>
-      <dd>{{ h.sockets | thousands }}</dd>
-    </div>
-    {% endif %}
-    {% if h.listening_mailboxes is not none %}
-    <div>
-      <dt>listening mailboxes</dt>
-      <dd>{{ h.listening_mailboxes | thousands }}</dd>
-    </div>
-    {% endif %}
-    {% if h.uptime_s is not none %}
-    <div>
-      <dt>relay uptime</dt>
-      <dd>{{ h.uptime_s | duration }}</dd>
-    </div>
-    {% endif %}
-    {% if h.checked_at %}
-    <div>
-      <dt>counters read</dt>
-      <dd>{{ h.checked_at | utc }}</dd>
-    </div>
-    {% endif %}
-    {% elif h %}
-    <div class="d-wide">
-      <dt>counters</dt>
-      <dd><span class="d-hint">not published right now ({{ h.error or 'no answer' }}); the handshake above is still checked</span></dd>
-    </div>
     {% endif %}
   </dl>
 </div>

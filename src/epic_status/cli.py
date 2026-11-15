@@ -212,7 +212,7 @@ async def _check(kind: Kind, raw: str, adapter: str | None = None) -> dict[str, 
         error=relay.error,
     )
     if relay.ok:
-        # One look at the relay's info document, and its counters if it is Epicmail: the
+        # One look at the relay's info document, and its readiness if it is Epicmail: the
         # same two reads the poller makes, so an operator sees what the board will show.
         async with build_client(timeout=settings.http_timeout_s) as client:
             timeout = settings.cadence.epicmail_timeout_s

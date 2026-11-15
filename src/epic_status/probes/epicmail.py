@@ -7,9 +7,9 @@ every relay. On top of it, Epicmail serves small JSON documents built for monito
 * `/.well-known/epicbox.json`: software, version, protocol versions (3.1.0 is transaction
   cancel), federation, and features (`mux/1`, the HTTPS pull API `https`).
 * `/v1/info`: the HTTPS pull API's own description, present when that API is on.
-* `/status.json`: aggregate counters (sockets, subscriptions, waiting messages, the
-  forward queue), uptime, `draining` and `store_ok`. Store totals come from the relay's
-  last housekeeping round, so a request never scans its tables.
+* `/status.json`: `draining` and `store_ok` are read from it. It also carries traffic
+  counts (sockets, mailboxes, waiting messages, the forward queue), which are not read:
+  they say how a relay is used, not whether it works.
 * `/ready`: readiness with a store write check, which the relay itself rate-limits to one
   write per five seconds. Read only when `/status.json` is missing.
 
@@ -20,7 +20,7 @@ challenge already proves that and more.
 status page for *any* path, and that page opens TLS connections to other relays to draw
 their dots. Polling it would make this service an amplifier. So:
 
-* the counters in `/status.json` are read only from a relay that has already identified
+* `/status.json` is read only from a relay that has already identified
   itself as Epicmail, whose documents are static JSON;
 * the one request that can reach a classic relay is detection, a single GET of
   `/.well-known/epicbox.json`, made when a relay is first seen, when its websocket
@@ -123,13 +123,6 @@ def _text(value: Any, limit: int) -> str | None:
     return text
 
 
-def _count(value: Any) -> int | None:
-    # bool is an int subclass; `true` is not a count.
-    if isinstance(value, bool) or not isinstance(value, int):
-        return None
-    return value if value >= 0 else None
-
-
 def _flag(value: Any) -> bool | None:
     return value if isinstance(value, bool) else None
 
@@ -175,34 +168,19 @@ def parse_v1_info(payload: Any, info: RelayInfo) -> bool:
     return protocol is not None and protocol == info.https_protocol
 
 
-_STATUS_COUNTS = (
-    "sockets",
-    "listening_mailboxes",
-    "classic_subscriptions",
-    "mux_holders",
-)
-_STORE_COUNTS = ("messages_waiting", "forwards_waiting", "forward_peers")
-
-
 def parse_status(payload: Any, *, now: datetime | None = None) -> RelayHealth:
-    """`/status.json` → RelayHealth. An allow-list: `name`, `identity`, store byte sizes
-    and anything added later are not copied."""
+    """`/status.json` → RelayHealth. Readiness only: `draining`, `store_ok` and the
+    version. The traffic counts in the same document are not read."""
     stamp = now or datetime.now(UTC)
     if not isinstance(payload, dict):
         return RelayHealth(ok=False, error="status document is not an object", checked_at=stamp)
-    store = payload.get("store")
-    store = store if isinstance(store, dict) else {}
-    fields: dict[str, Any] = {k: _count(payload.get(k)) for k in _STATUS_COUNTS}
-    fields.update({k: _count(store.get(k)) for k in _STORE_COUNTS})
     return RelayHealth(
         ok=True,
         source="status.json",
         version=_text(payload.get("version"), _VERSION_MAX),
-        uptime_s=_count(payload.get("uptime_s")),
         draining=_flag(payload.get("draining")),
         store_ok=_flag(payload.get("store_ok")),
         checked_at=stamp,
-        **fields,
     )
 
 

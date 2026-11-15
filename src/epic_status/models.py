@@ -217,27 +217,20 @@ class RelayInfo(BaseModel):
 
 
 class RelayHealth(BaseModel):
-    """Aggregate counters an Epicmail relay publishes at `/status.json`.
+    """Whether an Epicmail relay can take mail, from its `/status.json` (or `/ready`).
 
-    Counts only. The document has no addresses, keys or client IPs, and the fields
-    copied here are an allow-list, so a future field that did carry one would not be
-    republished by accident."""
+    Readiness only: `draining`, `store_ok` and the version. The document also carries
+    traffic counts (sockets, mailboxes, waiting messages, the forward queue); those say
+    how a relay is used, so none is copied, stored or published. An allow-list, so a
+    field added later is not republished by accident."""
 
     ok: bool
     """The endpoint answered with a usable document."""
     source: str = "status.json"
     """`status.json`, or `ready` when only `/ready` answered."""
     version: str | None = None
-    uptime_s: int | None = None
     draining: bool | None = None
     store_ok: bool | None = None
-    sockets: int | None = None
-    listening_mailboxes: int | None = None
-    classic_subscriptions: int | None = None
-    mux_holders: int | None = None
-    messages_waiting: int | None = None
-    forwards_waiting: int | None = None
-    forward_peers: int | None = None
     error: str | None = None
     checked_at: datetime | None = None
 

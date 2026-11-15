@@ -57,10 +57,10 @@ API. The board recommends it, marks the relays that run it, and reads more about
   hours for a relay already known to be Epicmail). The classic relay answers that path
   with its status page, which is why it stays rare.
 - **Health.** For an Epicmail relay, `/status.json` is read every two minutes (`/ready`
-  when it is missing): version, uptime, open sockets, listening mailboxes, waiting
-  messages, the forward queue, and whether the message store is OK. A relay that
-  completes the handshake but reports its store failing or a restart in progress is
-  shown as degraded. Counts only; nothing that identifies a wallet is read or published.
+  when it is missing) for one fact: whether it can take mail (message store OK, not
+  restarting). A relay that completes the handshake but reports its store failing or a
+  restart in progress is shown as degraded. The traffic counts in that document
+  (sockets, mailboxes, waiting messages, forward queue) are not read or published.
 - **The websocket handshake stays the check of record** for every relay, Epicmail or
   not, so uptime figures mean the same thing for all of them.
 - **API.** Each relay in `/api/v1/status.json` gains `software` (`"epicmail"`, another
