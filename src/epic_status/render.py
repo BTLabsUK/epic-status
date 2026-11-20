@@ -1280,6 +1280,12 @@ DONATE_ADDRESSES = (
         "qr": "epicbox",
     },
     {
+        "label": "epic1",
+        "note": "For wallets that pay epic1 addresses.",
+        "value": "epic1qx2awq8f9gu0txadk74sdzn36r64ghe5p8ah2krwyjgmwx3j7kh3kqlw3vfphq36p9zhzlcu2e2jjtltge3ywperwkm7cwq9kcau8rvhcs6aq3hm",
+        "qr": "epic1",
+    },
+    {
         "label": "HTTPS",
         "note": "BT Labs on the web.",
         "value": "https://wallet.btlabs.uk",

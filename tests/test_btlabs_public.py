@@ -11,7 +11,7 @@ import httpx
 import pytest
 
 from epic_status import btlabs_public as bp
-from epic_status.btlabs_public import BtlabsPublic, Rejected, extract_address, load_keyring, verify
+from epic_status.btlabs_public import BtlabsPublic, Rejected, extract_address, load_keyring, qr_svg, verify
 from epic_status.config import Settings
 from epic_status.render import DONATE_ADDRESSES, render_donate
 
@@ -162,3 +162,12 @@ def test_donate_page_uses_the_given_address_and_inlines_its_qr(tmp_path: Path) -
     assert "/static/qr/epicbox.svg" not in html and "/static/qr/https.svg" in html
     assert DONATE_ADDRESSES[0]["value"] == ADDRESS  # the bundled fallback is current
     assert "/static/qr/epicbox.svg" in render_donate(settings=settings)
+
+
+def test_donate_page_lists_the_epic1_address_with_its_static_qr(tmp_path: Path) -> None:
+    epic1 = next(d for d in DONATE_ADDRESSES if d["qr"] == "epic1")["value"]
+    assert epic1.startswith("epic1") and len(epic1) == 117
+    html = render_donate(settings=Settings(db=tmp_path / "s.db"), epicbox_address=ADDRESS, epicbox_qr_svg="<svg/>")
+    assert epic1 in html and "/static/qr/epic1.svg" in html
+    qr = Path(__file__).parent.parent / "src/epic_status/static/qr/epic1.svg"
+    assert qr.read_text() == qr_svg(epic1)
