@@ -175,7 +175,8 @@
   <div class="group-body" id="gb-epicbox">
   {#
     One table, two parts. A relay that runs Epicmail says so in its own
-    `/.well-known/epicbox.json`; every other relay is the classic Epicbox server. Each part
+    `/.well-known/epicbox.json`; the second part holds the classic Epicbox servers and the
+    `epicbox.` names kept for wallets that have the old address. Each part
     opens with a band that carries its mark, its repository and its latest release, so the
     release is stated once per software and never against the wrong rows.
 
@@ -183,9 +184,11 @@
     mix the parts; the header of the first list sorts both (app.js). The lists share one
     fixed track list, so their columns line up, and the stylesheet joins them into a single
     bordered table. The part that is empty is left out, band and all.
+
+    Which part a relay is in is decided in `render.relay_parts`: by what it runs, except
+    that the `epicbox.` name of a relay also listed under its `epicmail.` name goes to the
+    second part.
   #}
-  {% set em_relays = relays | selectattr('is_epicmail') | list %}
-  {% set classic_relays = relays | rejectattr('is_epicmail') | list %}
   {% if relays %}
   <div class="relay-parts">
     {% if em_relays %}

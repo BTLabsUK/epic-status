@@ -62,6 +62,9 @@ colours; the classic part is the same table at rest, with the same envelope in o
 colour, a lighter name, dim host names and measurements, and grey tiles. The state word and
 every warning colour keep full strength in both. The version column is labelled Protocol
 for relays, because the bands state a software release, which is a different number.
+A relay listed under two names, `epicmail.<domain>` and `epicbox.<domain>`, has its
+`epicmail.` row in the first part and its `epicbox.` row in the second, so the first part
+never says one relay twice.
 Under an Epicmail part the classic part is folded on load, at every width: its band stays,
 with a count of how many of its relays are online in place of the rows. It follows the
 group rule: a part with a relay that is not online stays open, opens itself if a fault

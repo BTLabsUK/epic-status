@@ -83,12 +83,17 @@ def test_a_seed_is_flagged_as_verified(seeds: list) -> None:
     because order here is an artefact of which section of the TOML an entry sits in, not
     a fact worth pinning.
     """
-    mine = sorted(t.slug for t in seeds if t.verified)
+    mine = sorted(t.slug for t in seeds if t.verified and t.operator == "btlabs")
     assert mine == [
         "epicbox.btlabs.uk",
+        "epicmail.btlabs.uk",
         "floo-node.btlabs.uk",
         "node.btlabs.uk",
     ]
+    # Verified without being ours: the `epicmail.` names of two relays whose `epicbox.`
+    # rows were verified by hand on the live board. Nothing else in the file is.
+    others = sorted(t.slug for t in seeds if t.verified and t.operator != "btlabs")
+    assert others == ["epicmail.epiccash.com", "epicmail.epicnet.us"]
 
 
 def test_country_codes_are_uppercase_alpha2(seeds: list) -> None:

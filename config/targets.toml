@@ -154,6 +154,52 @@ country = "GB"
 # the database as well as here, so it keeps its history from flooepicbox.
 notes = "BT Labs relay, for mainnet and floonet wallets"
 
+# 2026-11-22: the relays that run Epicmail are also reachable as `epicmail.<domain>`. Both
+# names are listed: `epicmail.` is the row in the Epicmail part of the relay table, and the
+# `epicbox.` name, kept for wallets that have the old address, moves to the folded Epicbox
+# part (render.relay_parts). Each pair is one machine and one relay process, so a pair goes
+# up and down together.
+#
+# `verified` and `country` repeat what the `epicbox.` row of the same relay has on the live
+# board, where they were set in /admin: a copy of a verified row is the same relay.
+
+[[epicbox]]
+slug = "epicmail.epiccash.com"
+display_host = "epicmail.epiccash.com"
+endpoint = "wss://epicmail.epiccash.com:443/"
+operator = "Epic Cash"
+verified = true
+country = "US"
+notes = "Same relay as epicbox.epiccash.com. Shares a host with node.epiccash.com"
+
+[[epicbox]]
+slug = "epicmail.epicnet.us"
+display_host = "epicmail.epicnet.us"
+endpoint = "wss://epicmail.epicnet.us:443/"
+operator = "epicnet.us"
+verified = true
+country = "US"
+notes = "Same relay as epicbox.epicnet.us. Shares a host with node.epicnet.us"
+
+# epicbox.iniaku.my.id is not in this file: its operator submitted it through /add. The
+# `epicmail.` name is listed here so that all four Epicmail relays have one.
+[[epicbox]]
+slug = "epicmail.iniaku.my.id"
+display_host = "epicmail.iniaku.my.id"
+endpoint = "wss://epicmail.iniaku.my.id:443/"
+operator = "Iniaku pool"
+notes = "Same relay as epicbox.iniaku.my.id"
+
+[[epicbox]]
+slug = "epicmail.btlabs.uk"
+display_host = "epicmail.btlabs.uk"
+endpoint = "wss://epicmail.btlabs.uk:443/"
+operator = "btlabs"
+label = "BT Labs Epicmail"
+ours = true
+country = "GB"
+notes = "Same relay as epicbox.btlabs.uk, for mainnet and floonet wallets"
+
 # Three relays were listed here and have been removed: epicbox.fastepic.eu and
 # epicbox.btlabs.tech, neither of which resolves, and epicbox.51pool.online,
 # which resolves but times out during the handshake. None ever completed one.

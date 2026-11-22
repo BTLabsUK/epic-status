@@ -747,6 +747,39 @@ def _base_context(
     }
 
 
+def _relay_host(status: TargetStatus) -> str:
+    """The relay's host name, lower case, without a port."""
+    return status.target.display_host.split(":", 1)[0].strip().lower()
+
+
+def relay_parts(
+    relays: Sequence[TargetStatus],
+) -> tuple[list[TargetStatus], list[TargetStatus]]:
+    """The relay table's two parts: the Epicmail part, then the Epicbox part.
+
+    A relay is in the Epicmail part when it runs Epicmail, with one exception. One relay
+    can be listed under two names, `epicmail.<domain>` and `epicbox.<domain>`, the second
+    kept for wallets that have the old address. Two rows for one relay in the same part
+    would say everything twice, so when both names are listed and both run Epicmail, the
+    `epicbox.` name goes to the Epicbox part, which the board keeps folded.
+
+    The `epicbox.` name of an Epicmail relay that has no `epicmail.` name listed stays in
+    the Epicmail part: it is the only row that relay has. Order within a part is the
+    snapshot's.
+    """
+    epicmail_hosts = {_relay_host(s) for s in relays if s.is_epicmail}
+    first: list[TargetStatus] = []
+    second: list[TargetStatus] = []
+    for status in relays:
+        host = _relay_host(status)
+        alias = (
+            host.startswith("epicbox.")
+            and "epicmail." + host.removeprefix("epicbox.") in epicmail_hosts
+        )
+        (first if status.is_epicmail and not alias else second).append(status)
+    return first, second
+
+
 def render_board(
     *,
     snapshot: Snapshot | None,
@@ -763,6 +796,7 @@ def render_board(
     context["countries"] = _country_options()
     context["nodes"] = snapshot.nodes if snapshot else []
     context["relays"] = snapshot.epicbox if snapshot else []
+    context["em_relays"], context["classic_relays"] = relay_parts(context["relays"])
     context["pools"] = snapshot.pools if snapshot else []
     context["quickcheck_enabled"] = getattr(settings, "quickcheck_enabled", True)
     context["qc"] = qc

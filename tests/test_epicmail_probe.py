@@ -658,3 +658,45 @@ def test_health_of_a_non_epicmail_relay_is_not_published() -> None:
     s = _status(False)
     s.relay_health = RelayHealth(ok=True, store_ok=True)
     assert epicmail_detail(s) is None
+
+
+def _named(host: str, epicmail_relay: bool) -> TargetStatus:
+    s = _status(epicmail_relay)
+    s.target = s.target.model_copy(update={"slug": host, "display_host": host})
+    return s
+
+
+def test_the_epicbox_name_of_a_relay_listed_twice_goes_to_the_second_part() -> None:
+    from epic_status.render import relay_parts
+
+    relays = [
+        _named("epicbox.one.example", True),
+        _named("epicmail.one.example", True),
+        # No `epicmail.` name listed: this row is the only one the relay has.
+        _named("epicbox.two.example", True),
+        # Its `epicmail.` name is listed but does not run Epicmail, so it is no pair.
+        _named("epicbox.three.example", True),
+        _named("epicmail.three.example", False),
+        _named("epicbox.classic.example", False),
+    ]
+    first, second = relay_parts(relays)
+    assert [s.target.display_host for s in first] == [
+        "epicmail.one.example",
+        "epicbox.two.example",
+        "epicbox.three.example",
+    ]
+    assert [s.target.display_host for s in second] == [
+        "epicbox.one.example",
+        "epicmail.three.example",
+        "epicbox.classic.example",
+    ]
+
+
+def test_a_port_or_capitals_in_the_host_do_not_hide_a_pair() -> None:
+    from epic_status.render import relay_parts
+
+    first, second = relay_parts(
+        [_named("Epicbox.One.example:443", True), _named("epicmail.one.example", True)]
+    )
+    assert [s.target.display_host for s in first] == ["epicmail.one.example"]
+    assert [s.target.display_host for s in second] == ["Epicbox.One.example:443"]
