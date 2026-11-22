@@ -18,7 +18,8 @@ mirrored by hand from devhub's `versions.js`, and went stale the day 4.1.0 shipp
 Bumping them on release is still good hygiene, not a requirement.
 
 `EPICBOX_PROTOCOL` is still a constant: the relay repository publishes no GitHub
-releases, so there is nothing to read.
+releases, so there is nothing to read. `EPICMAIL` is a seed like the node and wallet:
+Epicmail publishes releases, and `upstream.py` follows them.
 """
 
 from __future__ import annotations
@@ -36,6 +37,10 @@ WALLET: Final = "4.1.0"
 #: protocol version in the handshake, so this is comparable in the same way.
 EPICBOX_PROTOCOL: Final = "3.0.1"
 
+#: Seed for the latest Epicmail release. Stated in the Epicmail part of the relay table.
+#: Not compared with any row: a relay does not say which Epicmail release it runs.
+EPICMAIL: Final = "0.1.13"
+
 _NODE_REPO: Final = "https://github.com/EpicCash/epic"
 _WALLET_REPO: Final = "https://github.com/EpicCash/epic-wallet"
 #: The relay. Mirrors devhub's `repos.epicbox`. It publishes no GitHub *releases*, but it does
@@ -49,6 +54,10 @@ NODE_URL: Final = f"{_NODE_REPO}/releases/tag/v{NODE}"
 WALLET_URL: Final = f"{_WALLET_REPO}/releases/tag/v{WALLET}"
 NODE_RELEASES_URL: Final = f"{_NODE_REPO}/releases"
 EPICBOX_URL: Final = f"{_EPICBOX_REPO}/tree/{EPICBOX_PROTOCOL}"
+#: The classic relay's repository, linked from its part of the relay table.
+EPICBOX_REPO_URL: Final = _EPICBOX_REPO
 
-#: Epicmail's repository, linked from the Epicmail block in a relay's panel.
+#: Epicmail's repository, linked from its part of the relay table and from the Epicmail
+#: block in a relay's panel.
 EPICMAIL_URL: Final = "https://github.com/BTLabsUK/epicmail"
+EPICMAIL_RELEASE_URL: Final = f"{EPICMAIL_URL}/releases/tag/v{EPICMAIL}"

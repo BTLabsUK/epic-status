@@ -1288,6 +1288,8 @@ class Poller:
             released_node_url=node_release.url,
             released_node_source=node_release.source,
             released_wallet_version=self.releases.wallet.version,
+            released_epicmail_version=self.releases.epicmail.version,
+            released_epicmail_url=self.releases.epicmail.url,
             nodes_versioned=sum(1 for s in nodes if s.node_version),
             nodes_current=sum(
                 1 for s in nodes if s.node_version and s.node_version == released

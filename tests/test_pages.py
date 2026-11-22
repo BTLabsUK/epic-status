@@ -276,10 +276,13 @@ def test_pools_have_no_version_header(snapshot: Snapshot) -> None:
     assert "m3 m-empty" in html
 
 
-@pytest.mark.parametrize("group", ["group-node", "group-epicbox"])
-def test_nodes_and_relays_do_have_a_version_header(snapshot: Snapshot, group: str) -> None:
+def test_nodes_and_relays_do_have_a_version_header(snapshot: Snapshot) -> None:
+    """Same column in both tables. A relay's is labelled Protocol, because the bands in
+    the relay table state a software release, which is a different number."""
     html = render_board(snapshot=snapshot, settings=SETTINGS)
-    assert "Version" in "".join(_header_cells(html, group))
+    assert "Version" in "".join(_header_cells(html, "group-node"))
+    relay_head = "".join(_header_cells(html, "group-epicbox"))
+    assert "Protocol" in relay_head and "Version" not in relay_head
 
 
 def test_capabilities_render_as_words(snapshot: Snapshot) -> None:

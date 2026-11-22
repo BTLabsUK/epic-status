@@ -5256,37 +5256,15 @@ input[data-state='failed'] {
 /* ------------------------------------------------------------------ Epicmail
  *
  * A relay that says it runs Epicmail, in its own /.well-known/epicbox.json. Two places:
- * a word with the envelope mark beside the host name, and a block in the relay's panel. The mark keeps the repository's two colours; everything
- * else is the page's own type and hairlines, and no state colour is spent on it. */
+ * the band that opens the Epicmail part of the relay table, and a block in the relay's
+ * panel. The mark keeps the repository's two colours; everything else is the page's own
+ * type and hairlines, and no state colour is spent on it. */
 .icon-epicmail .em-body {
   stroke: var(--em-body);
 }
 
 .icon-epicmail .em-flap {
   stroke: var(--em-flap);
-}
-
-.em-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--sp-4);
-  margin-left: var(--sp-8);
-  padding: 0 var(--sp-6) 0 var(--sp-4);
-  border: 1px solid var(--line-strong);
-  border-radius: 999px;
-  font-family: var(--font-ui);
-  font-size: var(--t-micro);
-  font-weight: 600;
-  line-height: 1.5;
-  letter-spacing: 0.01em;
-  color: var(--ink);
-  vertical-align: 1px;
-  white-space: nowrap;
-  cursor: help;
-}
-
-.em-badge .icon-epicmail {
-  flex: none;
 }
 
 .d-em {
@@ -5332,4 +5310,154 @@ input[data-state='failed'] {
 .em-submit-note .icon-epicmail {
   flex: none;
   margin-top: 3px;
+}
+
+/* ------------------------------------------------------- relay table: two parts
+ *
+ * Transaction relays are one table in two parts: relays that run Epicmail, then the
+ * classic Epicbox server. Each part opens with a band: mark and name on the left, the
+ * repository and the latest release on the right.
+ *
+ * The two parts are told apart by weight, not by a label. The Epicmail part is the page
+ * at full strength: the envelope in its two colours, host names in full ink, server tiles
+ * in colour. The classic part is the same table at rest: the same envelope in one dim
+ * colour, a lighter name, host names and measurements in dim ink, tiles in grey. The
+ * state word and every warning colour keep full strength in both: a working relay is a
+ * working relay, and a fault is a fault.
+ *
+ * Markup is two lists inside `.relay-parts` (sorting works on a list at a time). They
+ * share the fixed track list, so columns line up; from 900px the second list drops its
+ * top border and the facing corners are squared, which makes them one bordered table. */
+.row-band {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-12);
+  min-height: 2.75rem;
+  border-top: 1px solid var(--line);
+}
+
+.rows > .row-band:first-child {
+  border-top: 0;
+}
+
+.row-band h3 {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-8);
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 0.875rem;
+  font-weight: 600;
+  letter-spacing: 0;
+  color: var(--ink);
+}
+
+.row-band h3 .icon {
+  flex: none;
+}
+
+.band-links {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--sp-16);
+  font-family: var(--font-mono);
+  font-size: var(--t-micro);
+  color: var(--ink-dim);
+  white-space: nowrap;
+}
+
+.band-links > a {
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-color: var(--line-strong);
+  text-underline-offset: 3px;
+}
+
+.band-links > a:hover,
+.band-links > a:focus-visible {
+  color: var(--ink);
+  text-decoration-color: currentColor;
+}
+
+.rows-classic .row-band h3 {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--ink-dim);
+}
+
+.rows-classic .row-host b {
+  font-weight: 500;
+  color: var(--ink-dim);
+}
+
+.rows-classic .srv-tile {
+  filter: grayscale(1);
+  opacity: 0.7;
+}
+
+.rows-classic .row-meta,
+.rows-classic .row-meta > .row-up,
+.rows-classic .cert:not(.cert-warn) b {
+  color: var(--ink-dim);
+}
+
+.rows-classic .band-links .rel {
+  color: var(--ink-dim);
+}
+
+@media (max-width: 899px) {
+  /* A band is a subheading on a phone: the hairline is above it, not between it and
+     its first host. */
+  .row-band + .row {
+    border-top: 0;
+  }
+
+  .relay-parts > .rows + .rows > .row-band:first-child {
+    border-top: 1px solid var(--line);
+  }
+
+  /* Text-sized links on a 44px line: the target is extended, the line is not. */
+  .band-links a {
+    position: relative;
+  }
+
+  .band-links a::before {
+    content: '';
+    position: absolute;
+    inset: -16px -8px;
+  }
+}
+
+@media (min-width: 900px) {
+  .row-band {
+    grid-column: 1 / -1;
+    min-height: 0;
+    padding: var(--sp-8) var(--sp-16);
+  }
+
+  .row-head + .row-band {
+    border-top: 0;
+  }
+
+  .relay-parts > .rows:not(:last-child) {
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+  }
+
+  .relay-parts > .rows + .rows {
+    border-top: 0;
+    border-top-left-radius: 0;
+    border-top-right-radius: 0;
+  }
+
+  /* Stripes follow the host rows, not the list: the band and the header shift the
+     parity, so each part starts plain and stripes its second host. */
+  .relay-parts .row:nth-child(odd) {
+    background: transparent;
+  }
+
+  .relay-parts .row:nth-child(even of .row) {
+    background: var(--stripe);
+  }
 }

@@ -846,6 +846,12 @@ class NetworkSummary(BaseModel):
 
     released_wallet_version: str | None = None
 
+    released_epicmail_version: str | None = None
+    """The latest Epicmail release, read the same way. Stated in the relay table and
+    compared with nothing: a relay does not say which release it runs."""
+
+    released_epicmail_url: str | None = None
+
     nodes_current: int = 0
     """Nodes reporting exactly `released_node_version`. Counted only over nodes that
     reported a version at all, so an unreachable node is absent from the numerator

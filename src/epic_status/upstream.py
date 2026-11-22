@@ -124,7 +124,8 @@ class Repo:
 
 NODE: Final = Repo("node", "EpicCash", "epic", releases.NODE)
 WALLET: Final = Repo("wallet", "EpicCash", "epic-wallet", releases.WALLET)
-REPOS: Final = (NODE, WALLET)
+EPICMAIL: Final = Repo("epicmail", "BTLabsUK", "epicmail", releases.EPICMAIL)
+REPOS: Final = (NODE, WALLET, EPICMAIL)
 
 
 @dataclass(frozen=True)
@@ -237,6 +238,10 @@ class ReleaseWatcher:
     @property
     def wallet(self) -> Release:
         return self.release(WALLET)
+
+    @property
+    def epicmail(self) -> Release:
+        return self.release(EPICMAIL)
 
     def fetched_repos(self) -> list[Repo]:
         if not self.enabled:

@@ -54,6 +54,15 @@ host; eight hosts ran to four screens and nothing lined up across rows.
 heading and "3 of 3 online" when every host in them is online; a group with a fault is
 open, and opens itself if a fault appears. With JavaScript off every group is open.
 
+**Transaction relays are one table in two parts.** Relays that run Epicmail come first,
+then the classic Epicbox server. Each part opens with a band: its mark and name on the
+left, its repository and latest release on the right. The parts are told apart by weight,
+not by a label: the Epicmail part is at full strength, with the envelope in its two
+colours; the classic part is the same table at rest, with the same envelope in one dim
+colour, a lighter name, dim host names and measurements, and grey tiles. The state word and
+every warning colour keep full strength in both. The version column is labelled Protocol
+for relays, because the bands state a software release, which is a different number.
+
 **The quick node check sits beside the verdict.** On a wide screen it takes the right half
 of the hero, which was empty; below 1100px it follows the verdict, facts and freshness line
 and precedes the node list — network first, then "is it my node", then the list. Closed it
@@ -71,7 +80,7 @@ and works as a plain form post with JavaScript off.
 | `--primary` / `--mark` | Gold. Brand and focus, never state. |
 | `--em-body` / `--em-flap` | The Epicmail envelope's two strokes, from the Epicmail repository's light and dark icons. Used only in that mark. |
 
-The Epicmail badge and the Epicmail block in a relay's panel use the page's own type, hairlines and gold link colour;
+The Epicmail band in the relay table and the Epicmail block in a relay's panel use the page's own type, hairlines and gold link colour;
 the envelope's blue flap is the only new hue, and it stays inside the 14-20px mark.
 
 Healthy is deliberately dull. Saturated hues are a budget, and spending them on the

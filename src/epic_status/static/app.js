@@ -876,7 +876,14 @@
           'aria-label',
           btn.textContent.trim() + ', sorted ' + (next === 'asc' ? 'ascending' : 'descending')
         );
-        applySort(list, key, next);
+        /* The relay table is two lists under one header (Epicmail, then the classic
+           relay): the header sorts each part in place, so a host never leaves its part. */
+        var parts = list.parentNode;
+        var set =
+          parts && parts.classList.contains('relay-parts')
+            ? parts.querySelectorAll(':scope > .rows')
+            : [list];
+        for (var s = 0; s < set.length; s++) applySort(set[s], key, next);
       });
     })(lists[li]);
   }

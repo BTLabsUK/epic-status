@@ -169,23 +169,52 @@
 #}
 <section class="group group-epicbox" data-fold>
   <div class="group-head">
-    <h2>Epicbox relays</h2>
+    <h2>Transaction relays</h2>
     {% if network %}{{ gsum('epicbox', network.epicbox_healthy, network.epicbox_total) }}{% endif %}
-    {#
-      Linked to the relay repository, not to a release tag: epic-epicbox-docker publishes no
-      tags, and pointing this at the node's release page would send a reader to the wrong
-      artifact to check a number they were just told was current.
-    #}
-    <span class="group-count">
-      latest: <a class="rel" href="{{ epicbox_url }}" rel="noreferrer">{{ epicbox_protocol }}</a>
-    </span>
   </div>
   <div class="group-body" id="gb-epicbox">
+  {#
+    One table, two parts. A relay that runs Epicmail says so in its own
+    `/.well-known/epicbox.json`; every other relay is the classic Epicbox server. Each part
+    opens with a band that carries its mark, its repository and its latest release, so the
+    release is stated once per software and never against the wrong rows.
+
+    Two lists rather than one, because sorting re-appends every `.row` of a list and would
+    mix the parts; the header of the first list sorts both (app.js). The lists share one
+    fixed track list, so their columns line up, and the stylesheet joins them into a single
+    bordered table. The part that is empty is left out, band and all.
+  #}
+  {% set em_relays = relays | selectattr('is_epicmail') | list %}
+  {% set classic_relays = relays | rejectattr('is_epicmail') | list %}
   {% if relays %}
-  <ul class="rows">
-    {{ r.head(Kind.EPICBOX) }}
-    {% for status in relays %}{{ r.row(status, Kind.EPICBOX, none) }}{% endfor %}
-  </ul>
+  <div class="relay-parts">
+    {% if em_relays %}
+    <ul class="rows rows-epicmail">
+      {{ r.head(Kind.EPICBOX) }}
+      <li class="row-band">
+        <h3>{{ mark_epicmail }}<span>Epicmail</span></h3>
+        <span class="band-links">
+          <a href="{{ epicmail_url }}" rel="noreferrer">GitHub</a>
+          <span>latest: <a class="rel" href="{{ epicmail_release_url }}" rel="noreferrer">{{ epicmail_release }}</a></span>
+        </span>
+      </li>
+      {% for status in em_relays %}{{ r.row(status, Kind.EPICBOX, none) }}{% endfor %}
+    </ul>
+    {% endif %}
+    {% if classic_relays %}
+    <ul class="rows rows-classic">
+      {% if not em_relays %}{{ r.head(Kind.EPICBOX) }}{% endif %}
+      <li class="row-band">
+        <h3>{{ mark_epicbox }}<span>Epicbox</span></h3>
+        <span class="band-links">
+          <a href="{{ epicbox_repo_url }}" rel="noreferrer">GitHub</a>
+          <span>latest: <a class="rel" href="{{ epicbox_url }}" rel="noreferrer">{{ epicbox_protocol }}</a></span>
+        </span>
+      </li>
+      {% for status in classic_relays %}{{ r.row(status, Kind.EPICBOX, none) }}{% endfor %}
+    </ul>
+    {% endif %}
+  </div>
   {% else %}
   <p class="prose">No relays yet. <a href="/add">Add one</a> and it appears once the handshake succeeds.</p>
   {% endif %}

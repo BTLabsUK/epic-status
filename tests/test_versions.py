@@ -187,10 +187,9 @@ def test_released_version_is_stated_once_not_per_row() -> None:
     # every row. The header states the release and nothing else: it used to add "is current"
     # and a count of how many nodes ran it, both of which the Version column already says.
     assert html.count("is released") == 3
-    # Two `.rel` links now: the node release tag and the Epicbox relay repository. Still
-    # one per group header, which is the property this test is about — the release is stated
-    # once per table, never per row.
-    assert html.count('class="rel"') == 2
+    # One `.rel` link: the node release tag. The relay table states a release in the band
+    # of each of its parts, and this board has no relays, so it has no bands.
+    assert html.count('class="rel"') == 1
     assert "latest:" in html
     assert "is current" not in html
     assert "running it" not in html

@@ -51,20 +51,6 @@
 {% endmacro %}
 
 {#
-  Epicmail, as the relay says in its own `/.well-known/epicbox.json`. A word as well as the
-  mark, for the same reason "verified" is a word: an envelope alone says nothing to a reader
-  who has not met it. The title carries the version and what it adds; the panel has the rest.
-#}
-{% macro epicmail_badge(status) %}
-{%- set info = status.relay_info -%}
-{%- set adds = [] -%}
-{%- if info.cancel %}{% set _ = adds.append('transaction cancel (3.1.0)') %}{% endif -%}
-{%- if info.mux %}{% set _ = adds.append('mux/1') %}{% endif -%}
-{%- if info.https_protocol %}{% set _ = adds.append('HTTPS pull API') %}{% endif -%}
-<span class="em-badge" title="Runs Epicmail{% if info.version %} {{ info.version }}{% endif %}{% if adds %}: {{ adds | join(', ') }}{% endif %}">{{ icon_epicmail }}<span>Epicmail</span></span>
-{%- endmacro %}
-
-{#
   The Epicmail part of a relay's panel: what the relay publishes about itself, and whether its
   message store is working, which the handshake cannot see. No traffic figures: waiting
   messages, sockets and mailboxes say how a relay is used, and are not shown. Shown under the
@@ -124,7 +110,7 @@
   <span class="row-host">
     {{ server_tile(t, 32, 128) }}
     <b>{{ t.display_host }}{% if t.verified %}<span class="verified-mark" role="img" title="Verified by the Epic Cash dev team" aria-label="Verified by the Epic Cash dev team">{{ icon_check }}</span>{% endif %}{% if kind == Kind.NODE %}{{ peers_hint(status) }}{% endif %}</b>
-    <span>{{ t.operator or t.label or 'operator not stated' }}{% if kind == Kind.EPICBOX and status.is_epicmail %}{{ epicmail_badge(status) }}{% endif %}</span>
+    <span>{{ t.operator or t.label or 'operator not stated' }}</span>
   </span>
 
   <span class="row-meta">
@@ -237,15 +223,16 @@
       >{{ icon_warn }}</span></span>
     </span>
     <span class="m m2 m-empty" aria-hidden="true"></span>
-    {# A relay's protocol version is its version, so it sits in the shared Version slot
-       rather than in a column of its own. #}
+    {# A relay's protocol version sits in the shared Version slot rather than in a column
+       of its own, and is labelled Protocol: the band above the rows states a software
+       release, which is a different number. #}
     <span class="m m3 ver{% if version_behind(status.protocol_version, epicbox_protocol) %} ver-old{% endif %}"
           data-field="protocol" data-slug="{{ t.slug }}"
           data-sort="{{ status.protocol_version or '' }}"
           {% if version_behind(status.protocol_version, epicbox_protocol) %}
           title="Speaking {{ status.protocol_version }}; {{ epicbox_protocol }} is current"
           {% endif %}>
-      <em>version</em>{{ status.protocol_version or '—' }}
+      <em>protocol</em>{{ status.protocol_version or '—' }}
     </span>
     <span class="m m4 m-empty" aria-hidden="true"></span>
     {% endif %}
@@ -727,7 +714,7 @@
   {% else %}
   {{ th('m1', 'TLS expires', 'h-m1') }}
   <span class="h-m2"></span>
-  {{ th('m3', 'Version', 'h-m3') }}
+  {{ th('m3', 'Protocol', 'h-m3') }}
   <span class="h-m4"></span>
   {% endif %}
   <span class="h-where">Location</span>

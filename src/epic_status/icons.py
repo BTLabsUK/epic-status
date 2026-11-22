@@ -113,3 +113,14 @@ def epicmail(size: int = 14) -> Markup:
         f'aria-hidden="true"><path class="em-body" d="{_EPICMAIL_BODY}"/>'
         f'<path class="em-flap" d="{_EPICMAIL_FLAP}"/></svg>'
     )
+
+
+def epicbox(size: int = 14) -> Markup:
+    """The same envelope in one colour, taken from the text around it: the mark of the
+    classic relay, where `epicmail` is the mark of the relay that replaces it."""
+    return Markup(
+        f'<svg class="icon icon-epicbox" width="{size}" height="{size}" viewBox="0 0 24 24" '
+        'fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" '
+        f'stroke-linejoin="round" aria-hidden="true"><path d="{_EPICMAIL_BODY}"/>'
+        f'<path d="{_EPICMAIL_FLAP}"/></svg>'
+    )

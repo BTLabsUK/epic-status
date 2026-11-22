@@ -548,7 +548,7 @@ def test_api_epicmail_detail_matches_its_documented_schema() -> None:
     assert set(detail["health"]) == set(schemas.EpicmailHealth.model_fields)
 
 
-def test_board_shows_the_badge_and_the_panel() -> None:
+def test_board_groups_relays_by_software_and_shows_the_panel() -> None:
     from datetime import UTC, datetime
 
     from epic_status.models import NetworkSummary, Snapshot
@@ -565,7 +565,20 @@ def test_board_shows_the_badge_and_the_panel() -> None:
         pools=[],
     )
     html = render_board(snapshot=snap, settings=Settings())
-    assert html.count('class="em-badge"') == 1
+    # One table in two parts: Epicmail first, then the classic relay. No per-row badge.
+    assert "<h2>Transaction relays</h2>" in html
+    assert "em-badge" not in html
+    em_at, classic_at = html.index('class="rows rows-epicmail"'), html.index('class="rows rows-classic"')
+    assert em_at < classic_at
+    em_part, classic_part = html[em_at:classic_at], html[classic_at:]
+    assert 'id="row-relay.example"' in em_part and 'id="row-old.example"' not in em_part
+    assert 'id="row-old.example"' in classic_part
+    # One column header for both parts, and one band each: name, repository, latest release.
+    assert html.count('class="row-head"') == 1 and html.count('class="row-band"') == 2
+    assert "<span>Epicmail</span>" in em_part and "<span>Epicbox</span>" in classic_part
+    assert 'href="https://github.com/BTLabsUK/epicmail/releases/tag/v' in em_part
+    assert 'href="https://github.com/EpicCash/epic-epicbox-docker"' in classic_part
+    assert html.count('class="rel"') == 2
     assert "recommended relay" not in html
     assert "tools/get.sh" not in html
     assert "https://github.com/BTLabsUK/epicmail" in html
@@ -580,6 +593,36 @@ def test_board_shows_the_badge_and_the_panel() -> None:
 
     form = render_submit(snapshot=snap, settings=Settings())
     assert 'value="epicmail"' in form and 'value="epicbox"' in form
+
+
+def test_a_board_with_only_classic_relays_keeps_its_column_header() -> None:
+    from datetime import UTC, datetime
+
+    from epic_status.models import NetworkSummary, Snapshot
+    from epic_status.render import render_board
+
+    snap = Snapshot(
+        generated_at=datetime.now(UTC),
+        prober_id="test",
+        network=NetworkSummary(
+            epicbox_total=1,
+            epicbox_healthy=1,
+            released_epicmail_version="9.8.7",
+            released_epicmail_url="https://github.com/BTLabsUK/epicmail/releases/tag/v9.8.7",
+        ),
+        nodes=[],
+        epicbox=[_status(False)],
+        pools=[],
+    )
+    html = render_board(snapshot=snap, settings=Settings())
+    assert 'class="rows rows-epicmail"' not in html
+    assert html.count('class="row-head"') == 1 and html.count('class="row-band"') == 1
+    # The Epicmail release belongs to the Epicmail band, which this board does not have.
+    assert "9.8.7" not in html
+
+    snap.epicbox.append(_status(True))
+    html = render_board(snapshot=snap, settings=Settings())
+    assert ">9.8.7</a>" in html
 
 
 def test_health_of_a_non_epicmail_relay_is_not_published() -> None:

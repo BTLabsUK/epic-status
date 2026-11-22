@@ -721,7 +721,20 @@ def _base_context(
         "icon_warn": icons.triangle_alert(12),
         "icon_peers": icons.users(13),
         "icon_epicmail": icons.epicmail(14),
+        # The two marks that head the two parts of the relay table: the envelope in the
+        # Epicmail repository's colours, and the same envelope in one quiet colour.
+        "mark_epicmail": icons.epicmail(18),
+        "mark_epicbox": icons.epicbox(16),
         "epicmail_url": releases.EPICMAIL_URL,
+        "epicmail_release": (
+            (snapshot.network.released_epicmail_version if snapshot else None)
+            or releases.EPICMAIL
+        ),
+        "epicmail_release_url": (
+            (snapshot.network.released_epicmail_url if snapshot else None)
+            or releases.EPICMAIL_RELEASE_URL
+        ),
+        "epicbox_repo_url": releases.EPICBOX_REPO_URL,
         "peers_note": peers_note,
         "epicbox_url": releases.EPICBOX_URL,
         # Strictly-older, not merely-different. A relay ahead of the published
