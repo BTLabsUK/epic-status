@@ -52,6 +52,7 @@ from .models import (
     Target,
     TargetStatus,
     Vantage,
+    relay_counts,
 )
 from .net import (
     Resolved,
@@ -1272,6 +1273,9 @@ class Poller:
                 addr = cached[1].primary
                 addresses[addr] = addresses.get(addr, 0) + 1
 
+        # A relay listed under two names is one relay in every total.
+        relay_total, relay_healthy, relay_degraded, relay_down = relay_counts(relays)
+
         summary = NetworkSummary(
             chain=chain,
             tip_height=tip,
@@ -1284,10 +1288,10 @@ class Poller:
             nodes_healthy=sum(1 for s in nodes if s.state is State.HEALTHY),
             nodes_degraded=sum(1 for s in nodes if s.state is State.DEGRADED),
             nodes_down=sum(1 for s in nodes if s.state is State.DOWN),
-            epicbox_total=len(relays),
-            epicbox_healthy=sum(1 for s in relays if s.state is State.HEALTHY),
-            epicbox_degraded=sum(1 for s in relays if s.state is State.DEGRADED),
-            epicbox_down=sum(1 for s in relays if s.state is State.DOWN),
+            epicbox_total=relay_total,
+            epicbox_healthy=relay_healthy,
+            epicbox_degraded=relay_degraded,
+            epicbox_down=relay_down,
             pools_total=len(pools),
             pools_healthy=sum(1 for s in pools if s.state is State.HEALTHY),
             pools_degraded=sum(1 for s in pools if s.state is State.DEGRADED),

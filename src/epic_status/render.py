@@ -38,6 +38,7 @@ from .models import (
     State,
     Target,
     TargetStatus,
+    relay_second_names,
 )
 from .probes.pool import ADAPTERS
 from .quickcheck import QuickCheckResult
@@ -747,11 +748,6 @@ def _base_context(
     }
 
 
-def _relay_host(status: TargetStatus) -> str:
-    """The relay's host name, lower case, without a port."""
-    return status.target.display_host.split(":", 1)[0].strip().lower()
-
-
 def relay_parts(
     relays: Sequence[TargetStatus],
 ) -> tuple[list[TargetStatus], list[TargetStatus]]:
@@ -760,23 +756,20 @@ def relay_parts(
     A relay is in the Epicmail part when it runs Epicmail, with one exception. One relay
     can be listed under two names, `epicmail.<domain>` and `epicbox.<domain>`, the second
     kept for wallets that have the old address. Two rows for one relay in the same part
-    would say everything twice, so when both names are listed and both run Epicmail, the
-    `epicbox.` name goes to the Epicbox part, which the board keeps folded.
+    would say everything twice, so the `epicbox.` name of such a pair goes to the Epicbox
+    part, which the board keeps folded. What a pair is: `models.relay_second_names`, the
+    same rule the relay totals use to count a pair once.
 
     The `epicbox.` name of an Epicmail relay that has no `epicmail.` name listed stays in
     the Epicmail part: it is the only row that relay has. Order within a part is the
     snapshot's.
     """
-    epicmail_hosts = {_relay_host(s) for s in relays if s.is_epicmail}
+    second_names = relay_second_names(relays)
     first: list[TargetStatus] = []
     second: list[TargetStatus] = []
     for status in relays:
-        host = _relay_host(status)
-        alias = (
-            host.startswith("epicbox.")
-            and "epicmail." + host.removeprefix("epicbox.") in epicmail_hosts
-        )
-        (first if status.is_epicmail and not alias else second).append(status)
+        in_first = status.is_epicmail and status.target.slug not in second_names
+        (first if in_first else second).append(status)
     return first, second
 
 

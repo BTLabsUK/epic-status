@@ -378,7 +378,13 @@ class Network(BaseModel):
     nodes_healthy: int = Field(0, examples=[3])
     nodes_degraded: int = Field(0, examples=[0])
     nodes_down: int = Field(0, examples=[4])
-    epicbox_total: int = Field(0, examples=[6])
+    epicbox_total: int = Field(
+        0,
+        examples=[6],
+        description="Relays, not rows: a relay listed under two names "
+        "(`epicmail.<domain>` and `epicbox.<domain>`) counts once, here and in the three "
+        "counts below, in the state of the worse of its two names.",
+    )
     epicbox_healthy: int = Field(0, examples=[3])
     epicbox_degraded: int = Field(0, examples=[0])
     epicbox_down: int = Field(0, examples=[3])

@@ -14,6 +14,7 @@ model silently fails on the second, which is the *better* deployment.
 from __future__ import annotations
 
 import enum
+from collections.abc import Sequence
 from datetime import UTC, datetime
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -776,6 +777,59 @@ class TargetStatus(BaseModel):
     """Most recent checks, oldest first. Rendered as the recent-checks strip."""
     vantages: list[Vantage] = Field(default_factory=list)
     """What other probers saw recently. Evidence beside the verdict, never part of it."""
+
+
+def relay_host(status: TargetStatus) -> str:
+    """The relay's host name, lower case, without a port."""
+    return status.target.display_host.split(":", 1)[0].strip().lower()
+
+
+def relay_second_names(relays: Sequence[TargetStatus]) -> dict[str, str]:
+    """Relays listed under two names: the slug of each `epicbox.` row → its `epicmail.` row.
+
+    One relay can be listed as `epicmail.<domain>` and as `epicbox.<domain>`, the second
+    kept for wallets that have the old address. It is a pair only when both names are
+    listed and both run Epicmail; an Epicmail relay with only an `epicbox.` name is not in
+    this mapping, and neither is a classic relay.
+    """
+    epicmail = {relay_host(s): s.target.slug for s in relays if s.is_epicmail}
+    pairs: dict[str, str] = {}
+    for status in relays:
+        host = relay_host(status)
+        if not (status.is_epicmail and host.startswith("epicbox.")):
+            continue
+        first = epicmail.get("epicmail." + host.removeprefix("epicbox."))
+        if first is not None and first != status.target.slug:
+            pairs[status.target.slug] = first
+    return pairs
+
+
+def relay_counts(relays: Sequence[TargetStatus]) -> tuple[int, int, int, int]:
+    """Relays as (total, healthy, degraded, down), a relay listed under two names once.
+
+    A pair is counted in the state of the worse of its two names: a relay whose old
+    address does not answer is not up for the wallets that use that address, and counting
+    only the `epicmail.` name would say "all relays are up" above a row that is down.
+    """
+    pairs = relay_second_names(relays)
+    second_state: dict[str, State] = {}
+    for status in relays:
+        first = pairs.get(status.target.slug)
+        if first is not None:
+            second_state[first] = status.state
+    total = healthy = degraded = down = 0
+    for status in relays:
+        if status.target.slug in pairs:
+            continue
+        total += 1
+        states = {status.state, second_state.get(status.target.slug, status.state)}
+        if State.DOWN in states:
+            down += 1
+        elif State.DEGRADED in states:
+            degraded += 1
+        elif states == {State.HEALTHY}:
+            healthy += 1
+    return total, healthy, degraded, down
 
 
 class NetworkSummary(BaseModel):

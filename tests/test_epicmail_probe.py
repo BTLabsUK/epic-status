@@ -700,3 +700,32 @@ def test_a_port_or_capitals_in_the_host_do_not_hide_a_pair() -> None:
     )
     assert [s.target.display_host for s in first] == ["epicmail.one.example"]
     assert [s.target.display_host for s in second] == ["Epicbox.One.example:443"]
+
+
+def test_a_relay_listed_under_two_names_counts_once() -> None:
+    from epic_status.models import relay_counts
+
+    relays = [
+        _named("epicmail.one.example", True),
+        _named("epicbox.one.example", True),
+        _named("epicbox.two.example", True),
+        _named("epicbox.classic.example", False),
+    ]
+    assert relay_counts(relays) == (3, 3, 0, 0)
+
+
+def test_a_pair_counts_in_the_state_of_the_worse_name() -> None:
+    from epic_status.models import relay_counts
+
+    first, second = _named("epicmail.one.example", True), _named("epicbox.one.example", True)
+    other = _named("epicbox.classic.example", False)
+
+    second.state = State.DOWN
+    assert relay_counts([first, second, other]) == (2, 1, 0, 1)
+    second.state = State.DEGRADED
+    assert relay_counts([second, first, other]) == (2, 1, 1, 0)
+    first.state, second.state = State.DOWN, State.HEALTHY
+    assert relay_counts([first, second, other]) == (2, 1, 0, 1)
+    # Not yet checked is in no bucket, as for a single row.
+    first.state, second.state = State.HEALTHY, State.UNKNOWN
+    assert relay_counts([first, second, other]) == (2, 1, 0, 0)
