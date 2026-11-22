@@ -5406,6 +5406,63 @@ input[data-state='failed'] {
   color: var(--ink-dim);
 }
 
+/* The classic part folds under an Epicmail part (app.js, `data-part-fold`). The button is
+   built around the band's name and styled as that name plus a chevron, so the band keeps
+   its shape when the script runs. Folded, the band says how many relays are in it and how
+   many answer; open, the rows say that themselves and the count is not shown. */
+.part-fold {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-8);
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  letter-spacing: inherit;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+.part-fold .chev {
+  color: var(--ink-dim);
+  transition: transform var(--dur) var(--ease);
+}
+
+.part-fold[aria-expanded='false'] .chev {
+  transform: rotate(-90deg);
+}
+
+.row-band:has(.part-fold) {
+  cursor: pointer;
+}
+
+.rows.is-part-folded > .row {
+  display: none;
+}
+
+.band-sum {
+  display: none;
+  font-size: var(--t-small);
+  color: var(--ink-dim);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.is-part-folded .band-sum {
+  display: inline;
+}
+
+.band-sum b {
+  font-weight: 600;
+}
+
+.band-sum.is-short b {
+  color: var(--warn-ink);
+}
+
 @media (max-width: 899px) {
   /* A band is a subheading on a phone: the hairline is above it, not between it and
      its first host. */
@@ -5415,6 +5472,16 @@ input[data-state='failed'] {
 
   .relay-parts > .rows + .rows > .row-band:first-child {
     border-top: 1px solid var(--line);
+  }
+
+  /* A folded band on a phone is its name and its count; the links come back with the
+     rows, as a folded group drops its own "latest" line. */
+  .is-part-folded .band-links {
+    display: none;
+  }
+
+  .part-fold {
+    min-height: 2.75rem;
   }
 
   /* Text-sized links on a 44px line: the target is extended, the line is not. */

@@ -676,6 +676,7 @@
           .concat(data.pools || []);
         for (var i = 0; i < rows.length; i++) patchRow(rows[i], net);
         openTroubledGroups();
+        syncParts();
 
         /* The strip states the released version once. Its count still has to move,
            because a node upgrading is exactly the change this line exists to show. */
@@ -1366,6 +1367,80 @@
     else if (NARROW.addListener) NARROW.addListener(onWidth);
   }
 
+  /* ---------------------------------------------------------- part folds
+   *
+   * The classic part of the relay table, when it sits under an Epicmail part, is folded on
+   * load at every width: its band stays, with a count in place of its rows. Like a group,
+   * it is only folded while every relay in it is online, a fault opens it after a poll,
+   * and a reader who opened it is never folded back on. Built here for the same reason as
+   * the group fold: with JavaScript off the part is open, which is the correct page.
+   */
+  var foldParts = [].slice.call(document.querySelectorAll('.rows[data-part-fold]'));
+
+  function partCalm(list) {
+    return (
+      !!list.querySelector(':scope > .row') &&
+      !list.querySelector(':scope > .row:not(.state-healthy)')
+    );
+  }
+
+  function partButton(list) {
+    var h3 = list.querySelector(':scope > .row-band h3');
+    if (!h3) return null;
+    var btn = h3.querySelector('.part-fold');
+    if (btn) return btn;
+    btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'part-fold';
+    btn.setAttribute('aria-expanded', 'true');
+    while (h3.firstChild) btn.appendChild(h3.firstChild);
+    btn.insertAdjacentHTML('beforeend', CHEV);
+    h3.appendChild(btn);
+    btn.addEventListener('click', function () {
+      setPartFold(list, btn.getAttribute('aria-expanded') === 'true');
+    });
+    return btn;
+  }
+
+  function setPartFold(list, folded) {
+    var btn = partButton(list);
+    if (!btn) return;
+    btn.setAttribute('aria-expanded', folded ? 'false' : 'true');
+    list.classList.toggle('is-part-folded', folded);
+    if (folded && openRow && list.contains(openRow)) {
+      collapse(openRow);
+      openRow = null;
+    }
+  }
+
+  /* After every poll: the count follows the rows, and a part with a fault in it opens. */
+  function syncParts() {
+    for (var i = 0; i < foldParts.length; i++) {
+      var list = foldParts[i];
+      var total = list.querySelectorAll(':scope > .row').length;
+      var ok = list.querySelectorAll(':scope > .row.state-healthy').length;
+      var sum = list.querySelector('[data-part-sum]');
+      if (sum) {
+        var b = sum.querySelector('b');
+        if (b) b.textContent = String(ok);
+        sum.classList.toggle('is-short', ok < total);
+      }
+      if (list.classList.contains('is-part-folded') && !partCalm(list)) setPartFold(list, false);
+    }
+  }
+
+  for (var fp = 0; fp < foldParts.length; fp++) {
+    setPartFold(foldParts[fp], partCalm(foldParts[fp]));
+  }
+
+  /* The whole band is the target, as a folded group's heading line is. Links stay links. */
+  document.addEventListener('click', function (event) {
+    var band = event.target.closest('.rows[data-part-fold] > .row-band');
+    if (!band || event.target.closest('a, button')) return;
+    var btn = band.querySelector('.part-fold');
+    if (btn) btn.click();
+  });
+
   /* The count in each group's heading, kept in step with the rows under it. */
   function setSum(key, healthy, total) {
     var el = document.querySelector('[data-sum="' + key + '"]');
@@ -1560,6 +1635,8 @@
       event.preventDefault();
       var group = row.closest('.group[data-fold]');
       if (group && group.classList.contains('is-folded')) setFold(group, false);
+      var part = row.closest('.rows[data-part-fold]');
+      if (part && part.classList.contains('is-part-folded')) setPartFold(part, false);
       if (!row.classList.contains('is-open')) toggleRow(row);
       row.scrollIntoView({ block: 'start', behavior: prefersStill() ? 'auto' : 'smooth' });
       var toggle = row.querySelector('.row-toggle');

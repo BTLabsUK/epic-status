@@ -597,6 +597,10 @@ def test_board_groups_relays_by_software_and_shows_the_panel() -> None:
     # One column header for both parts, and one band each: name, repository, latest release.
     assert html.count('class="row-head"') == 1 and html.count('class="row-band"') == 2
     assert "<span>Epicmail</span>" in em_part and "<span>Epicbox</span>" in classic_part
+    # Under an Epicmail part the classic part is marked to fold and carries its count.
+    assert 'class="rows rows-classic" data-part-fold' in html
+    assert "data-part-sum" in classic_part and "data-part-sum" not in em_part
+    assert "<b>1</b> of 1 online" in classic_part
     assert 'href="https://github.com/BTLabsUK/epicmail/releases/tag/v' in em_part
     assert 'href="https://github.com/EpicCash/epic-epicbox-docker"' in classic_part
     assert html.count('class="rel"') == 2
@@ -638,6 +642,8 @@ def test_a_board_with_only_classic_relays_keeps_its_column_header() -> None:
     html = render_board(snapshot=snap, settings=Settings())
     assert 'class="rows rows-epicmail"' not in html
     assert html.count('class="row-head"') == 1 and html.count('class="row-band"') == 1
+    # Alone it is the whole table, so it is not folded away.
+    assert "data-part-fold" not in html and "data-part-sum" not in html
     # The Epicmail release belongs to the Epicmail band, which this board does not have.
     assert "9.8.7" not in html
 

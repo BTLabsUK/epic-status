@@ -62,6 +62,11 @@ colours; the classic part is the same table at rest, with the same envelope in o
 colour, a lighter name, dim host names and measurements, and grey tiles. The state word and
 every warning colour keep full strength in both. The version column is labelled Protocol
 for relays, because the bands state a software release, which is a different number.
+Under an Epicmail part the classic part is folded on load, at every width: its band stays,
+with a count of how many of its relays are online in place of the rows. It follows the
+group rule: a part with a relay that is not online stays open, opens itself if a fault
+appears, and is never folded back on a reader who opened it. With JavaScript off it is
+open. A board with no Epicmail relay shows the classic part open, as the whole table.
 
 **The quick node check sits beside the verdict.** On a wide screen it takes the right half
 of the hero, which was empty; below 1100px it follows the verdict, facts and freshness line

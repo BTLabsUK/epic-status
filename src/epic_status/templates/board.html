@@ -202,10 +202,22 @@
     </ul>
     {% endif %}
     {% if classic_relays %}
-    <ul class="rows rows-classic">
+    {#
+      Under an Epicmail part this part is folded by app.js on load, at every width, and
+      opens itself when a relay in it is not online. `data-part-fold` marks it; the count
+      is what the folded band says in place of its rows. With JavaScript off, and on a
+      board with no Epicmail relay, the part is open and the count is not shown.
+    #}
+    <ul class="rows rows-classic"{% if em_relays %} data-part-fold{% endif %}>
       {% if not em_relays %}{{ r.head(Kind.EPICBOX) }}{% endif %}
       <li class="row-band">
         <h3>{{ mark_epicbox }}<span>Epicbox</span></h3>
+        {% if em_relays %}
+        {% set classic_ok = classic_relays | selectattr('state', 'equalto', State.HEALTHY) | list | length %}
+        <span class="band-sum{% if classic_ok < classic_relays | length %} is-short{% endif %}" data-part-sum>
+          <b>{{ classic_ok }}</b> of {{ classic_relays | length }} online
+        </span>
+        {% endif %}
         <span class="band-links">
           <a href="{{ epicbox_repo_url }}" rel="noreferrer">GitHub</a>
           <span>latest: <a class="rel" href="{{ epicbox_url }}" rel="noreferrer">{{ epicbox_protocol }}</a></span>
