@@ -480,6 +480,27 @@ async def test_restart_loads_detection_from_the_database(
 
 
 @respx.mock
+async def test_restart_knows_the_software_before_the_first_refresh(
+    db: Database, settings: Settings, poller: Poller
+) -> None:
+    """The sweep builds its statuses before the background refresh has run, so the
+    stored answer is loaded on its own; otherwise an Epicmail relay is listed with the
+    classic ones for one sweep after every restart."""
+    relay = _relay(db)
+    _mock_epicmail()
+    await poller._refresh_relay_software([relay], {relay.slug: _ok()}, 1000.0)
+
+    fresh = Poller(db, settings)
+    assert not fresh._relay_status(relay, _ok()).is_epicmail
+    fresh._load_relay_info(5.0)
+    assert fresh._relay_status(relay, _ok()).is_epicmail
+    # Loading again changes nothing, and the next ask keeps its six-hour distance.
+    due = fresh._next_detect[relay.id]
+    fresh._load_relay_info(500.0)
+    assert fresh._next_detect[relay.id] == due
+
+
+@respx.mock
 async def test_a_relay_reporting_its_store_failing_is_degraded(
     db: Database, poller: Poller
 ) -> None:

@@ -266,6 +266,10 @@ class Poller:
         # Enrichment is per target and chain-blind, so it is spawned once for the
         # whole fleet — except tip age, which is "how old is *this chain's* newest
         # block" and is therefore spawned per chain below.
+        # Before any status is built: what each relay runs decides which part of the
+        # relay table its row is in, so the first sweep after a restart needs it too.
+        self._load_relay_info(now)
+
         self._spawn(self._refresh_versions(nodes, node_probes, now))
         self._spawn(self._refresh_status(nodes, now))
         self._spawn(self._refresh_p2p(nodes, node_probes, now))
@@ -740,6 +744,27 @@ class Poller:
         if days is not None:
             self.db.set_cert_expiry(target.id, datetime.now(UTC) + timedelta(days=days))
 
+    def _load_relay_info(self, now: float) -> None:
+        """Once per process: the stored answer per relay, and when each is next asked.
+
+        Called by the sweep before it builds any status, not left to the background
+        refresh, which starts after the first sweep's statuses are already made. Without
+        it every relay is shown as the classic software until the second sweep.
+        """
+        if self._relay_info_loaded:
+            return
+        self._relay_info_loaded = True
+        wall = datetime.now(UTC)
+        for target_id, (info, checked_at) in self.db.relay_infos().items():
+            self._relay_info[target_id] = info
+            cadence = (
+                self.settings.cadence.epicmail_info_s
+                if info is not None and info.is_epicmail
+                else self.settings.cadence.relay_detect_s
+            )
+            age = (wall - checked_at).total_seconds() if checked_at else cadence
+            self._next_detect[target_id] = now + max(0.0, cadence - age)
+
     async def _refresh_relay_software(
         self, relays: list[Target], probes: dict[str, EpicboxProbe], now: float
     ) -> None:
@@ -755,18 +780,7 @@ class Poller:
         that is down cannot answer, and asking would only turn its outage into a lost
         badge.
         """
-        if not self._relay_info_loaded:
-            self._relay_info_loaded = True
-            wall = datetime.now(UTC)
-            for target_id, (info, checked_at) in self.db.relay_infos().items():
-                self._relay_info[target_id] = info
-                cadence = (
-                    self.settings.cadence.epicmail_info_s
-                    if info is not None and info.is_epicmail
-                    else self.settings.cadence.relay_detect_s
-                )
-                age = (wall - checked_at).total_seconds() if checked_at else cadence
-                self._next_detect[target_id] = now + max(0.0, cadence - age)
+        self._load_relay_info(now)
         await asyncio.gather(
             *(
                 self._one_relay_software(t, probes.get(t.slug), now)
