@@ -144,7 +144,155 @@ ENDPOINT_INDEX: dict[str, Any] = {
     "version": "1.1",
 }
 
-PAYLOADS = {"iniaku": INIAKU, "epicpool": EPICPOOL}
+# Recorded from https://pool.minefleet.fr/api/pools on 2026-11-23, trimmed to the two Epic
+# entries (ProgPoW, RandomX) and one other coin.
+MINEFLEET: dict[str, Any] = {'pools': [{'id': 'epic-pplns',
+            'coin': {'type': 'EPIC',
+                     'name': 'Epic Cash',
+                     'symbol': 'EPIC',
+                     'family': 'grin',
+                     'algorithm': 'ProgPoW'},
+            'ports': {'3633': {'name': 'Stratum solo',
+                               'protocol': 'stratum',
+                               'tls': False,
+                               'difficulty': 200000000,
+                               'varDiff': {'minDiff': 1000000,
+                                           'maxDiff': 4503599627370496,
+                                           'targetTime': 15,
+                                           'retargetTime': 60}},
+                      '3634': {'name': 'Stratum PPLNS',
+                               'protocol': 'stratum',
+                               'tls': False,
+                               'difficulty': 200000000,
+                               'varDiff': {'minDiff': 1000000,
+                                           'maxDiff': 4503599627370496,
+                                           'targetTime': 15,
+                                           'retargetTime': 60}}},
+            'paymentProcessing': {'enabled': True,
+                                  'minimumPayment': 0.1,
+                                  'payoutScheme': 'PPLNS'},
+            'poolFeePercent': 1.5,
+            'poolStats': {'connectedMiners': 87,
+                          'connectedWorkers': 87,
+                          'poolHashrate': 7503197641.891985,
+                          'sharesPerSecond': 5.739030646753883},
+            'networkStats': {'networkType': 'Main',
+                             'rewardType': 'POW',
+                             'blockHeight': 3811150,
+                             'networkDifficulty': 1757668464457,
+                             'networkHashrate': 29294474407.616665,
+                             'connectedPeers': 24,
+                             'lastNetworkBlockTime': '2026-11-23T18:30:44.000Z'},
+            'totalBlocks': 1657,
+            'lastPoolBlockTime': '2026-11-23T18:28:39.831Z',
+            'poolEffort': 0.18559942387523987},
+           {'id': 'epic-cpu-pplns',
+            'coin': {'type': 'EPIC',
+                     'name': 'Epic Cash',
+                     'symbol': 'EPIC',
+                     'family': 'grin',
+                     'algorithm': 'RandomX'},
+            'ports': {'3635': {'name': 'Stratum solo',
+                               'protocol': 'stratum',
+                               'tls': False,
+                               'difficulty': 16384,
+                               'varDiff': {'minDiff': 5000,
+                                           'maxDiff': 17592186044416,
+                                           'targetTime': 30,
+                                           'retargetTime': 60}},
+                      '3636': {'name': 'Stratum PPLNS',
+                               'protocol': 'stratum',
+                               'tls': False,
+                               'difficulty': 16384,
+                               'varDiff': {'minDiff': 5000,
+                                           'maxDiff': 17592186044416,
+                                           'targetTime': 30,
+                                           'retargetTime': 60}}},
+            'paymentProcessing': {'enabled': True,
+                                  'minimumPayment': 0.1,
+                                  'payoutScheme': 'PPLNS'},
+            'poolFeePercent': 1.5,
+            'poolStats': {'connectedMiners': 12,
+                          'connectedWorkers': 12,
+                          'poolHashrate': 92027.89583695031,
+                          'sharesPerSecond': 0.43807201843547516},
+            'networkStats': {'networkType': 'Main',
+                             'rewardType': 'POW',
+                             'blockHeight': 3811150,
+                             'networkDifficulty': 1359039761,
+                             'networkHashrate': 22650662.683333334,
+                             'connectedPeers': 24,
+                             'lastNetworkBlockTime': '2026-11-23T18:30:44.000Z'},
+            'totalBlocks': 31,
+            'lastPoolBlockTime': '2026-11-23T16:05:33.491Z',
+            'poolEffort': 0.28471515660780045},
+           {'id': 'btc-pplns',
+            'coin': {'type': 'BTC',
+                     'name': 'Bitcoin',
+                     'symbol': 'BTC',
+                     'family': 'bitcoin',
+                     'algorithm': 'SHA-256'},
+            'ports': {'3833': {'name': 'Stratum solo',
+                               'protocol': 'stratum',
+                               'tls': False,
+                               'difficulty': 1024,
+                               'varDiff': {'minDiff': 1,
+                                           'maxDiff': 1000000000000,
+                                           'targetTime': 10,
+                                           'retargetTime': 30}},
+                      '3834': {'name': 'Stratum PPLNS',
+                               'protocol': 'stratum',
+                               'tls': False,
+                               'difficulty': 1024,
+                               'varDiff': {'minDiff': 1,
+                                           'maxDiff': 1000000000000,
+                                           'targetTime': 10,
+                                           'retargetTime': 30}}},
+            'paymentProcessing': {'enabled': True,
+                                  'minimumPayment': 0.0001,
+                                  'payoutScheme': 'PPLNS'},
+            'poolFeePercent': 2,
+            'poolStats': {'connectedMiners': 6,
+                          'connectedWorkers': 6,
+                          'poolHashrate': 8202532342028.086,
+                          'sharesPerSecond': 0.5982048795753938},
+            'networkStats': {'networkType': 'Main',
+                             'rewardType': 'POW',
+                             'blockHeight': 977250,
+                             'networkDifficulty': 134823837323272.66,
+                             'networkHashrate': 1.180275786954413e+21,
+                             'connectedPeers': 10,
+                             'lastNetworkBlockTime': '2026-11-23T18:18:53.618Z'},
+            'totalBlocks': 0,
+            'poolEffort': 5.911120880568752e-12}],
+ 'generatedAt': '2026-11-23T18:33:07.282Z'}
+
+# Recorded from /api/pools/epic-pplns/blocks?page=0&pageSize=5 on 2026-11-23 (one block kept
+# per list; the newest first, as the pool returns them).
+MINEFLEET_BLOCKS_PROGPOW: list[dict[str, Any]] = [
+    {
+        "poolId": "epic-pplns",
+        "blockHeight": 3811146,
+        "status": "pending",
+        "confirmationProgress": 0.003,
+        "miner": "esZo3x...m924",
+        "created": "2026-11-23T18:28:39.831Z",
+        "effort": 1.27,
+    }
+]
+MINEFLEET_BLOCKS_RANDOMX: list[dict[str, Any]] = [
+    {
+        "poolId": "epic-cpu-pplns",
+        "blockHeight": 3811100,
+        "status": "confirmed",
+        "confirmationProgress": 1,
+        "miner": "esZo3x...m924",
+        "created": "2026-11-23T17:50:00.000Z",
+        "effort": 0.8,
+    }
+]
+
+PAYLOADS = {"iniaku": INIAKU, "epicpool": EPICPOOL, "minefleet": MINEFLEET}
 
 
 # ------------------------------------------------------------------ real payloads
@@ -183,11 +331,89 @@ def test_epicpool_payload_parses() -> None:
     assert probe.last_block_at == datetime(2026, 11, 23, 9, 29, 17, 925242, tzinfo=UTC)
 
 
+def test_minefleet_payload_parses() -> None:
+    probe = parse_pool_stats(MINEFLEET, ADAPTERS["minefleet"])
+    assert probe.ok
+    assert probe.miners == 87 + MINEFLEET["pools"][1]["poolStats"]["connectedMiners"]
+    assert probe.hashrate is not None
+    assert probe.hashrate.progpow == pytest.approx(7503197641.891985)
+    assert probe.hashrate.randomx == MINEFLEET["pools"][1]["poolStats"]["poolHashrate"]
+    assert probe.hashrate.cuckoo is None
+    assert probe.fee_percent == pytest.approx(1.5)
+    assert probe.payout == ["PPLNS"]
+    assert probe.chain_height == 3811150
+    assert probe.last_block_at == datetime(2026, 11, 23, 18, 28, 39, 831000, tzinfo=UTC)
+    # Not in /api/pools: filled by the enrich step.
+    assert probe.last_block_height is None
+
+
+def test_minefleet_without_an_epic_entry_is_unreadable() -> None:
+    payload = {"pools": [p for p in MINEFLEET["pools"] if p["coin"]["symbol"] != "EPIC"]}
+    probe = parse_pool_stats(payload, ADAPTERS["minefleet"])
+    assert not probe.ok
+    assert probe.reason is Reason.BAD_RESPONSE
+    assert "EPIC" in (probe.error or "")
+
+
+def test_minefleet_enrich_takes_the_newest_block_and_skips_orphans() -> None:
+    adapter = ADAPTERS["minefleet"]
+    base = parse_pool_stats(MINEFLEET, adapter)
+    orphan = {**MINEFLEET_BLOCKS_PROGPOW[0], "blockHeight": 3811200, "status": "orphaned"}
+    assert adapter.enrich is not None
+    probe = adapter.enrich(base, [[orphan, *MINEFLEET_BLOCKS_PROGPOW], MINEFLEET_BLOCKS_RANDOMX])
+    assert probe.last_block_height == 3811146
+    assert probe.last_block_at == datetime(2026, 11, 23, 18, 28, 39, 831000, tzinfo=UTC)
+
+
+def test_minefleet_enrich_with_failed_fetches_keeps_the_probe() -> None:
+    adapter = ADAPTERS["minefleet"]
+    base = parse_pool_stats(MINEFLEET, adapter)
+    assert adapter.enrich is not None
+    assert adapter.enrich(base, [None, {"not": "a list"}]) == base
+
+
+@pytest.mark.parametrize("fail", [False, True])
+def test_probe_pool_fetches_the_extras_and_survives_their_failure(fail: bool) -> None:
+    import asyncio
+
+    import httpx
+
+    from epic_status.net import Resolved
+    from epic_status.probes.pool import probe_pool
+
+    seen: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(request.url.raw_path.decode())
+        if request.url.path == "/api/pools":
+            return httpx.Response(200, json=MINEFLEET)
+        if fail:
+            return httpx.Response(200, text="<html>not json</html>")
+        return httpx.Response(200, json=MINEFLEET_BLOCKS_PROGPOW)
+
+    async def run() -> PoolProbe:
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+            resolved = Resolved(
+                hostname="pool.example", port=443, addresses=("203.0.113.9",), scheme="https"
+            )
+            return await probe_pool(client, resolved, "minefleet")
+
+    probe = asyncio.run(run())
+    assert probe.ok
+    assert seen[1:] == [
+        "/api/pools/epic-pplns/blocks?page=0&pageSize=5",
+        "/api/pools/epic-cpu-pplns/blocks?page=0&pageSize=5",
+    ]
+    assert probe.last_block_height == (None if fail else 3811146)
+
+
 @pytest.mark.parametrize("name", sorted(PAYLOADS))
 def test_every_reader_fills_the_same_output(name: str) -> None:
     """THE POINT of the parser: whichever API answered, the board is fed one shape."""
     probe = parse_pool_stats(PAYLOADS[name], ADAPTERS[name])
     assert probe.ok
+    if ADAPTERS[name].enrich is not None:
+        probe = ADAPTERS[name].enrich(probe, [MINEFLEET_BLOCKS_PROGPOW, MINEFLEET_BLOCKS_RANDOMX])
     assert isinstance(probe.miners, int)
     assert isinstance(probe.workers, int)
     assert probe.hashrate is not None

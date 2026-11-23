@@ -20,7 +20,9 @@ Adding a pool
 2. Write `_read_<name>(payload) -> PoolProbe`. Use the helpers below for every value
    (`_count`, `_rate`, `_when`, `_payout`), raise `Unreadable` when the response is not
    the stats document, and leave a field None when the API does not publish it.
-3. Add `"<name>": PoolAdapter(path=..., read=_read_<name>)` to `ADAPTERS`.
+3. Add `"<name>": PoolAdapter(path=..., read=_read_<name>)` to `ADAPTERS`. An API whose
+   main document lacks a field another route has may add `extra_paths` and an `enrich`
+   function (see `minefleet`); a failed extra fetch never makes a good probe bad.
 4. Add the `[[pool]]` entry to config/targets.toml with `adapter = "<name>"`.
 
 Nothing else changes: the row, the panel and status.json are fed from `PoolProbe`.
@@ -76,6 +78,11 @@ class PoolAdapter:
 
     path: str
     read: Callable[[dict[str, Any]], PoolProbe]
+    # Optional second requests, made only after the main probe is good. `enrich` gets
+    # the probe and one decoded body per path, None where that fetch or decode failed,
+    # and returns the probe with whatever it could add.
+    extra_paths: tuple[str, ...] = ()
+    enrich: Callable[[PoolProbe, list[Any]], PoolProbe] | None = None
 
 
 # ---------------------------------------------------------------------- helpers
@@ -284,9 +291,93 @@ def _read_epicpool(payload: dict[str, Any]) -> PoolProbe:
     )
 
 
+def _read_minefleet(payload: dict[str, Any]) -> PoolProbe:
+    """pool.minefleet.fr, `GET /api/pools` (Miningcore-style, cached 30 s).
+
+    `{"pools": [...]}` holds every coin the pool mines. Epic Cash is two entries, one
+    per algorithm, told apart by `coin.algorithm` (ProgPoW, RandomX); there is no Cuckoo.
+    `networkStats.blockHeight` is the node's chain height. The list carries no height of
+    the last block found: `_enrich_minefleet` adds it from the blocks routes.
+    """
+    pools = payload.get("pools")
+    if not isinstance(pools, list):
+        raise Unreadable("no pools in response (wrong path?)")
+    entries = [
+        p
+        for p in pools
+        if isinstance(p, dict) and _section(p, "coin").get("symbol") == "EPIC"
+    ]
+    if not entries:
+        raise Unreadable("no EPIC pool in response")
+
+    def total(section: str, key: str) -> int | None:
+        known = [v for p in entries if (v := _count(_section(p, section).get(key))) is not None]
+        return sum(known) if known else None
+
+    rates: dict[str, float | None] = {}
+    for p in entries:
+        algo = _section(p, "coin").get("algorithm")
+        if isinstance(algo, str):
+            rates[algo.strip().lower()] = _rate(_section(p, "poolStats").get("poolHashrate"))
+
+    fees = [f for p in entries if (f := _fee(p.get("poolFeePercent"))) is not None]
+    schemes: list[str] = []
+    for p in entries:
+        for name in _payout(_section(p, "paymentProcessing").get("payoutScheme")):
+            if name not in schemes:
+                schemes.append(name)
+    heights = [
+        h for p in entries if (h := _count(_section(p, "networkStats").get("blockHeight"))) is not None
+    ]
+    times = [t for p in entries if (t := _when(p.get("lastPoolBlockTime"))) is not None]
+
+    return PoolProbe(
+        ok=True,
+        miners=total("poolStats", "connectedMiners"),
+        workers=total("poolStats", "connectedWorkers"),
+        hashrate=PoolHashrate(
+            randomx=rates.get("randomx"), progpow=rates.get("progpow"), cuckoo=None
+        ),
+        fee_percent=max(fees) if fees else None,
+        payout=schemes,
+        last_block_at=max(times) if times else None,
+        chain_height=max(heights) if heights else None,
+    )
+
+
+def _enrich_minefleet(probe: PoolProbe, bodies: list[Any]) -> PoolProbe:
+    """Height of the newest block either Epic pool found, from `/blocks` (newest first).
+    Orphaned blocks are not blocks the pool found. A failed fetch leaves the probe as is."""
+    best: tuple[int, datetime | None] | None = None
+    for body in bodies:
+        if not isinstance(body, list):
+            continue
+        for block in body:
+            if not isinstance(block, dict) or block.get("status") == "orphaned":
+                continue
+            height = _count(block.get("blockHeight"))
+            if height is not None and (best is None or height > best[0]):
+                best = (height, _when(block.get("created")))
+    if best is None:
+        return probe
+    update: dict[str, Any] = {"last_block_height": best[0]}
+    if best[1] is not None:
+        update["last_block_at"] = best[1]
+    return probe.model_copy(update=update)
+
+
 ADAPTERS: dict[str, PoolAdapter] = {
     "iniaku": PoolAdapter(path="/api/pool/stats", read=_read_iniaku),
     "epicpool": PoolAdapter(path="/api/v1/pool/summary", read=_read_epicpool),
+    "minefleet": PoolAdapter(
+        path="/api/pools",
+        read=_read_minefleet,
+        extra_paths=(
+            "/api/pools/epic-pplns/blocks?page=0&pageSize=5",
+            "/api/pools/epic-cpu-pplns/blocks?page=0&pageSize=5",
+        ),
+        enrich=_enrich_minefleet,
+    ),
 }
 
 
@@ -389,6 +480,23 @@ async def probe_pool(
         )
 
     probe = parse_pool_stats(payload, adapter)
+    if probe.ok and adapter.enrich is not None and adapter.extra_paths:
+        bodies: list[Any] = []
+        for extra in adapter.extra_paths:
+            try:
+                extra_response = await client.get(
+                    pinned_url(resolved, extra),
+                    headers={"host": resolved.hostname, "accept": "application/json"},
+                    extensions={"sni_hostname": resolved.hostname},
+                    timeout=httpx.USE_CLIENT_DEFAULT if timeout is None else timeout,
+                )
+                bodies.append(extra_response.json() if extra_response.status_code < 400 else None)
+            except Exception:  # noqa: BLE001 - an extra is a bonus, never a failure
+                bodies.append(None)
+        try:
+            probe = adapter.enrich(probe, bodies)
+        except Exception:  # noqa: BLE001
+            pass
     return probe.model_copy(
         update={"latency_ms": latency_ms, "http_status": response.status_code}
     )

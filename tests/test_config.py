@@ -210,7 +210,11 @@ def test_a_pool_endpoint_may_differ_from_its_display_host(tmp_path: Path) -> Non
 def test_the_listed_pools(seeds: list) -> None:
     """epicmine.io was removed on 2026-11-23: no miners and no block for ten days."""
     pools = {t.slug: t.adapter for t in seeds if t.kind is Kind.POOL}
-    assert pools == {"epic.iniaku.my.id": "iniaku", "epicpool.io": "epicpool"}
+    assert pools == {
+        "epic.iniaku.my.id": "iniaku",
+        "epicpool.io": "epicpool",
+        "pool.minefleet.fr": "minefleet",
+    }
 
 
 def test_an_unknown_adapter_is_a_startup_failure(tmp_path: Path) -> None:

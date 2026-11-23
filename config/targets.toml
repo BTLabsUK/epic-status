@@ -255,6 +255,20 @@ operator = "Epic Pool"
 country = "NL"
 notes = "Stratum in the Netherlands. Fee 2.5%"
 
+[[pool]]
+slug = "pool.minefleet.fr"
+display_host = "pool.minefleet.fr"
+endpoint = "https://pool.minefleet.fr"
+adapter = "minefleet"
+operator = "MineFleet"
+# 2026-11-23. A public, keyless API (documented at https://pool.minefleet.fr/#/epic/api),
+# behind Caddy and cached for 30 s. Epic Cash is two pools, ProgPoW and RandomX, no
+# Cuckoo; /api/pools answered in ~210 ms and the last-block heights come from two
+# small /blocks requests. The site resolves to two addresses, both in France (OVH and
+# Velia).
+country = "FR"
+notes = "Stratum in France. Fee 1.5%"
+
 # epicmine.io was listed here and has been removed. Its API still answers, with no
 # miners connected and no block found since 2026-11-13. History is kept; removing
 # a seed disables the row rather than deleting it.
