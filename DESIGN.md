@@ -71,6 +71,16 @@ group rule: a part with a relay that is not online stays open, opens itself if a
 appears, and is never folded back on a reader who opened it. With JavaScript off it is
 open. A board with no Epicmail relay shows the classic part open, as the whole table.
 
+**A pool row shows miners, last block and hashrate by algorithm.** Every pool's API is
+read into one shape, so the row is the same whichever pool it is. Hashrate is two columns,
+RandomX and ProgPow, in the slots a node uses for version and peers; there is no total,
+because the algorithms are different units of work and their sum is the ProgPow figure.
+Cuckoo, workers, the fee, the payout schemes, the height of the last block found and,
+where the pool states it, the height of its own node are in the row's panel. The pool
+table divides the four metric tracks to suit these values and keeps their combined width,
+so Location and every column after it line up with the other two tables. On a phone the
+row keeps four cells and the panel carries the hashrate.
+
 **The quick node check sits beside the verdict.** On a wide screen it takes the right half
 of the hero, which was empty; below 1100px it follows the verdict, facts and freshness line
 and precedes the node list — network first, then "is it my node", then the list. Closed it

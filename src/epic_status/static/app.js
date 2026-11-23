@@ -261,6 +261,23 @@
     return Number(value).toLocaleString('en-US');
   }
 
+  /* Mirrors render._hashrate exactly: three significant figures and an SI prefix. */
+  var SI_PREFIXES = [[1e12, 'T'], [1e9, 'G'], [1e6, 'M'], [1e3, 'k'], [1, '']];
+
+  function fmtHash(value, unit) {
+    if (value === null || value === undefined) return '—';
+    if (value <= 0) return '0';
+    for (var i = 0; i < SI_PREFIXES.length; i++) {
+      var scale = SI_PREFIXES[i][0];
+      if (value >= scale * 0.9995 || scale === 1) {
+        var scaled = value / scale;
+        var digits = scaled >= 99.95 ? 0 : scaled >= 9.995 ? 1 : 2;
+        return scaled.toFixed(digits) + ' ' + SI_PREFIXES[i][1] + (unit || 'H/s');
+      }
+    }
+    return '—';
+  }
+
   /* Mirrors render._pct exactly, including the 99.95% rounding gate. No data is an em
      dash and never 0%: a target with no history is not a target with no uptime, and
      printing 0% for one is how a status page libels an operator. */
@@ -536,6 +553,9 @@
       /* No height and no tip comparison: a pool's block height is the last block it
          won, not its chain tip. See probes/pool.py. */
       setAge(slug, 'lastblock', row.last_block_at);
+      var rate = row.hashrate || {};
+      setField(slug, 'hash-randomx', fmtHash(rate.randomx), rate.randomx);
+      setField(slug, 'hash-progpow', fmtHash(rate.progpow), rate.progpow);
     } else {
       setVersion(slug, 'protocol', row.protocol_version, EPICBOX_PROTOCOL);
       setCert(slug, row.cert_expires_in_days);

@@ -191,12 +191,26 @@ def test_pool_endpoints_are_https_without_a_trailing_slash(seeds: list) -> None:
         assert not t.endpoint.endswith("/"), t.slug
 
 
-def test_a_pool_endpoint_may_differ_from_its_display_host(seeds: list) -> None:
-    """Not a typo when it happens: epicmine's site is epicmine.io and its API is on
-    api.epicmine.io, so these two fields are independent for pools."""
-    pools = {t.slug: t for t in seeds if t.kind is Kind.POOL}
-    assert "epicmine.io" in pools
-    assert urlsplit(pools["epicmine.io"].endpoint).hostname == "api.epicmine.io"
+def test_a_pool_endpoint_may_differ_from_its_display_host(tmp_path: Path) -> None:
+    """Not a typo when it happens: a pool can serve its site on one hostname and its API
+    on another, so these two fields are independent for pools."""
+    path = tmp_path / "targets.toml"
+    path.write_text(
+        '[[pool]]\n'
+        'slug = "p.example"\n'
+        'display_host = "p.example"\n'
+        'endpoint = "https://api.p.example"\n'
+        'adapter = "epicpool"\n'
+    )
+    (pool,) = load_seed_targets(path)
+    assert pool.display_host == "p.example"
+    assert urlsplit(pool.endpoint).hostname == "api.p.example"
+
+
+def test_the_listed_pools(seeds: list) -> None:
+    """epicmine.io was removed on 2026-11-23: no miners and no block for ten days."""
+    pools = {t.slug: t.adapter for t in seeds if t.kind is Kind.POOL}
+    assert pools == {"epic.iniaku.my.id": "iniaku", "epicpool.io": "epicpool"}
 
 
 def test_an_unknown_adapter_is_a_startup_failure(tmp_path: Path) -> None:

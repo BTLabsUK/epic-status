@@ -305,7 +305,7 @@ def pool_adapters() -> frozenset[str]:
 
 def _pool_target(raw: dict[str, object]) -> Target:
     """A pool's endpoint is the base of its *API*, which is not always its public
-    host: epicmine serves its site on epicmine.io and its API on api.epicmine.io.
+    host: a pool can serve its site on one hostname and its API on another.
     So display_host and endpoint are independent here rather than derived, and the
     adapter names which response shape to expect.
     """

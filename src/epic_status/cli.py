@@ -124,9 +124,8 @@ async def _check(kind: Kind, raw: str, adapter: str | None = None) -> dict[str, 
         # Resolved from the registry before any network work, because both facts a
         # pool probe needs are configuration rather than DNS: which adapter to use,
         # and which host the API is actually on. `normalise` can only produce the
-        # submitted hostname, and for epicmine that is the website — the stats live
-        # on api.epicmine.io. Probing the normalised host returns HTML and reads as
-        # a broken pool.
+        # submitted hostname, and a pool may keep its website there and its stats on
+        # another host. Probing the website returns HTML and reads as a broken pool.
         entry = next(
             (
                 t
@@ -172,7 +171,10 @@ async def _check(kind: Kind, raw: str, adapter: str | None = None) -> dict[str, 
             latency_ms=pool.latency_ms,
             miners=pool.miners,
             workers=pool.workers,
+            hashrate=pool.hashrate.model_dump() if pool.hashrate else None,
             fee_percent=pool.fee_percent,
+            payout=pool.payout,
+            chain_height=pool.chain_height,
             last_block_height=pool.last_block_height,
             last_block_at=(
                 pool.last_block_at.isoformat() if pool.last_block_at else None

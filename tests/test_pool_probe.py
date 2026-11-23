@@ -1,18 +1,18 @@
-"""Mining pool probe.
+"""Mining pool probe: one parser, a reader per pool API, one output.
 
 Every payload in this file is a real recorded response from the pool it claims to
-come from, trimmed only by dropping entries from the `latest` block array. Two pools
-implement the same idea with different envelopes and different units for the fee, so
-synthetic fixtures here would test the fixtures rather than the adapters.
+come from, trimmed only by dropping entries from a block list. The pools implement the
+same idea with different envelopes, names and units, so synthetic fixtures here would
+test the fixtures rather than the readers.
 
-The two assertions that matter most, because both are silent failures in production:
+The assertions that matter most, because each is a silent failure in production:
 
-* The fee unit. One pool says `"0.02"` meaning 2%, the other says `2.5` meaning 2.5%.
-  Get it wrong and the board shows 0.02%, which looks like a number rather than like
-  a bug.
-* That `currentHeight` is never published as a chain height. It is the last block the
-  pool *found*, and comparing it to the network tip marks small pools degraded for
-  being small. There is a test below that fails if a `height` field reappears.
+* Both pools come out in the same shape, in the same units.
+* The fee. A pool changed `"0.02"` to `"2"` and the board showed 200%. A fee that is
+  not a percentage between 0 and 100 is not published.
+* The last block a pool FOUND is never published as a chain height. Comparing it to the
+  network tip marks small pools degraded for being small. `chain_height` is filled only
+  from a field an API documents as the chain height.
 """
 
 from __future__ import annotations
@@ -23,47 +23,56 @@ from typing import Any
 import pytest
 
 from epic_status.config import Thresholds
-from epic_status.models import PoolProbe, Reason, State
+from epic_status.models import PoolHashrate, PoolProbe, Reason, State
 from epic_status.probes.pool import (
     ADAPTERS,
     PoolAdapter,
+    Unreadable,
     _as_float,
     _as_int,
+    _fee,
+    _payout,
+    _when,
     parse_pool_stats,
 )
+from epic_status.render import _hashrate
 from epic_status.score import pool_state
 
-# Recorded from https://epic.iniaku.my.id/api/pool/stats on 2026-09-22.
+# Recorded from https://epic.iniaku.my.id/api/pool/stats on 2026-11-23.
 INIAKU: dict[str, Any] = {
     "status": True,
     "data": {
-        "poolInfo": {"method": ["pplns", "solo"], "fee": "0.02", "threshold": "p1/s3"},
+        "poolInfo": {"method": ["pplns", "solo"], "fee": "2", "threshold": "p1/s3"},
         "poolStats": {
-            "activeUsers": 9,
-            "activeWorkers": 25,
-            "hashrateRandomX": 600317.8622949035,
-            "hashrateProgPow": 8640849593.129318,
-            "hashrateCuckoo": 0,
-            "onlineRandomX": 11,
-            "onlineProgPow": 14,
-            "onlineCuckoo": 0,
-            "currentHeight": 3721246,
+            "activeUsers": 228,
+            "activeWorkers": 1413,
+            "hashrateRandomX": 17133466.289580908,
+            "hashrateProgPow": 21590502594.64744,
+            "hashrateCuckoo": 57035.44444444444,
+            "hashrateWindow": "1h",
+            "hashrate10mRandomX": 17879387.023510974,
+            "hashrate10mProgPow": 21425468257.34052,
+            "hashrate10mCuckoo": 0,
+            "onlineRandomX": 833,
+            "onlineProgPow": 491,
+            "onlineCuckoo": 89,
+            "currentHeight": 3810659,
         },
         "poolBlocks": {
-            "total": 4093,
-            "soloBlocks": 233,
-            "poolBlocks": 3783,
-            "orphans": 77,
-            "paid": 2515,
-            "unpaid": 1501,
-            "lastFound": 3721246,
+            "total": 20151,
+            "soloBlocks": 2430,
+            "poolBlocks": 17554,
+            "orphans": 167,
+            "paid": 7404,
+            "unpaid": 12580,
+            "lastFound": 3810659,
             "latest": [
                 {
-                    "blockHeight": 3721246,
-                    "time": 1790062475,
+                    "blockHeight": 3810659,
+                    "time": 1795429645,
                     "algo": "Progpow",
                     "reward": 0.9889,
-                    "hash": "4122824b6ebbfbb45f2ee993b9bc204156dcdd3ac6928ad677475e3f03c68ca9",
+                    "hash": "f1ef1a40f077dd2a2497b1e0819be595adb5d75cc4bf128fdee33778ac53b4be",
                     "is_solo": False,
                     "maturity": "immature",
                     "paid": False,
@@ -73,38 +82,60 @@ INIAKU: dict[str, Any] = {
     },
 }
 
-# Recorded from https://api.epicmine.io/pool/getstats on 2026-09-22. No envelope,
-# fee as a number of percent, and the key order differs — all three are why this is
-# a separate adapter rather than a tolerant parser.
-EPICMINE: dict[str, Any] = {
-    "poolInfo": {"method": ["pplns", "solo", "party"], "fee": 2.5, "threshold": 0.1},
-    "poolStats": {
-        "activeUsers": 118,
-        "activeWorkers": 523,
-        "hashrateRandomX": 5277677.523545707,
-        "hashrateProgPow": 10103547918.168043,
-        "hashrateCuckoo": 0.989010989010989,
-        "onlineRandomX": 340,
-        "onlineProgPow": 181,
-        "onlineCuckoo": 2,
-        "currentHeight": 3721247,
+# Recorded from https://epicpool.io/api/v1/pool/summary on 2026-11-23. Flat, per
+# algorithm, ISO timestamps, and `height` documented as the chain height.
+EPICPOOL: dict[str, Any] = {
+    "algos": {
+        "cuckoo": {
+            "hashrate": 0,
+            "hashrate_average": 0,
+            "miners": 0,
+            "workers": 0,
+            "blocks_24h": 0,
+            "last_block": None,
+            "network_hashrate": 10152001.766666668,
+            "network_difficulty": 609120106,
+        },
+        "progpow": {
+            "hashrate": 642480332.516267,
+            "hashrate_average": 309500000,
+            "miners": 4,
+            "workers": 11,
+            "blocks_24h": 12,
+            "last_block": {"height": 3810348, "time": "2026-11-23T05:32:57.300358Z"},
+            "network_hashrate": 29935293900.6,
+            "network_difficulty": 1796117634036,
+        },
+        "randomx": {
+            "hashrate": 653773.6058539139,
+            "hashrate_average": 338833.3333333333,
+            "miners": 2,
+            "workers": 28,
+            "blocks_24h": 15,
+            "last_block": {"height": 3810597, "time": "2026-11-23T09:29:17.925242Z"},
+            "network_hashrate": 20506566.183333334,
+            "network_difficulty": 1230393971,
+        },
     },
-    "poolBlocks": {
-        "lastFound": 3721247,
-        "latest": [
-            {
-                "blockHeight": 3721247,
-                "time": 1790062486,
-                "algo": "RandomX",
-                "hash": "867d9215900d85801b6ab0d14d8a607c76504b0c624ac0b9a8f9fcc19371ad5e",
-            }
-        ],
-    },
+    "coin": "EPIC",
+    "fee_percent": 2.5,
+    "height": 3810661,
+    "payout_scheme": "PPLNS",
+    "payout_threshold": "0.10000000",
+    "pool": "epicpool.io",
+    "stratum": [
+        {
+            "region": "Europe",
+            "location": "Netherlands",
+            "host": "eu1.epicpool.io",
+            "ports": {"plain": 3333, "tls": 3334},
+        }
+    ],
 }
 
-# What api.epicmine.io returns for a path that does not exist. It is a 200 with a
-# valid JSON body, which is why a status code cannot be trusted there.
-EPICMINE_INDEX: dict[str, Any] = {
+# What a pool's API host returned for a path that does not exist: a 200 with a valid
+# JSON body, which is why a status code cannot be trusted on a stats route.
+ENDPOINT_INDEX: dict[str, Any] = {
     "endpoints": {
         "/explorer": ["/getsupply", "/getheight"],
         "/pool": ["/getlocations", "/getstats"],
@@ -113,6 +144,8 @@ EPICMINE_INDEX: dict[str, Any] = {
     "version": "1.1",
 }
 
+PAYLOADS = {"iniaku": INIAKU, "epicpool": EPICPOOL}
+
 
 # ------------------------------------------------------------------ real payloads
 
@@ -120,108 +153,173 @@ EPICMINE_INDEX: dict[str, Any] = {
 def test_iniaku_payload_parses() -> None:
     probe = parse_pool_stats(INIAKU, ADAPTERS["iniaku"])
     assert probe.ok
-    assert probe.miners == 9
-    assert probe.workers == 25
-    assert probe.last_block_height == 3721246
     assert probe.reason is Reason.OK
+    assert probe.miners == 228
+    assert probe.workers == 1413
+    assert probe.hashrate == PoolHashrate(
+        randomx=17133466.289580908, progpow=21590502594.64744, cuckoo=57035.44444444444
+    )
+    assert probe.fee_percent == pytest.approx(2.0)
+    assert probe.payout == ["PPLNS", "SOLO"]
+    assert probe.last_block_height == 3810659
+    assert probe.last_block_at == datetime(2026, 11, 23, 10, 27, 25, tzinfo=UTC)
 
 
-def test_epicmine_payload_parses() -> None:
-    probe = parse_pool_stats(EPICMINE, ADAPTERS["epicmine"])
+def test_epicpool_payload_parses() -> None:
+    probe = parse_pool_stats(EPICPOOL, ADAPTERS["epicpool"])
     assert probe.ok
-    assert probe.miners == 118
-    assert probe.workers == 523
-    assert probe.last_block_height == 3721247
+    assert probe.reason is Reason.OK
+    # Summed across algorithms: the summary has no pool-wide count.
+    assert probe.miners == 6
+    assert probe.workers == 39
+    # The on-turn figure, not `hashrate_average`.
+    assert probe.hashrate == PoolHashrate(
+        randomx=653773.6058539139, progpow=642480332.516267, cuckoo=0.0
+    )
+    assert probe.fee_percent == pytest.approx(2.5)
+    assert probe.payout == ["PPLNS"]
+    # The latest block of any algorithm, with that block's own time.
+    assert probe.last_block_height == 3810597
+    assert probe.last_block_at == datetime(2026, 11, 23, 9, 29, 17, 925242, tzinfo=UTC)
+
+
+@pytest.mark.parametrize("name", sorted(PAYLOADS))
+def test_every_reader_fills_the_same_output(name: str) -> None:
+    """THE POINT of the parser: whichever API answered, the board is fed one shape."""
+    probe = parse_pool_stats(PAYLOADS[name], ADAPTERS[name])
+    assert probe.ok
+    assert isinstance(probe.miners, int)
+    assert isinstance(probe.workers, int)
+    assert probe.hashrate is not None
+    assert probe.hashrate.randomx is not None and probe.hashrate.progpow is not None
+    assert probe.fee_percent is not None and 0 <= probe.fee_percent <= 100
+    assert probe.payout and all(p.isupper() for p in probe.payout)
+    assert isinstance(probe.last_block_height, int)
+    assert probe.last_block_at is not None
+    # Naive datetimes silently compare wrong against datetime.now(UTC).
+    assert probe.last_block_at.tzinfo is not None
+
+
+def test_every_adapter_has_a_recorded_payload() -> None:
+    """A reader without a real response under test is a reader nobody has checked."""
+    assert set(PAYLOADS) == set(ADAPTERS)
+
+
+# ------------------------------------------------------------------------ the fee
 
 
 @pytest.mark.parametrize(
-    ("name", "payload", "expected_percent"),
-    [
-        # THE POINT. Same real-world fee magnitude, two units. A parser that trusts
-        # the number reports one of these as 0.02%.
-        ("iniaku", INIAKU, 2.0),
-        ("epicmine", EPICMINE, 2.5),
-    ],
+    ("raw", "expected"),
+    [("2", 2.0), (2.5, 2.5), ("0", 0.0), (100, 100.0), (200, None), (-1, None), ("x", None)],
 )
-def test_fee_is_normalised_to_percent(
-    name: str, payload: dict[str, Any], expected_percent: float
+def test_a_fee_outside_a_percentage_is_not_published(
+    raw: Any, expected: float | None
 ) -> None:
-    probe = parse_pool_stats(payload, ADAPTERS[name])
-    assert probe.fee_percent == pytest.approx(expected_percent)
+    assert _fee(raw) == expected
 
 
-def test_last_block_time_becomes_an_aware_datetime() -> None:
-    probe = parse_pool_stats(EPICMINE, ADAPTERS["epicmine"])
-    assert probe.last_block_at == datetime(2026, 9, 22, 7, 34, 46, tzinfo=UTC)
-    # Naive datetimes silently compare wrong against datetime.now(UTC).
-    assert probe.last_block_at is not None
-    assert probe.last_block_at.tzinfo is not None
+def test_the_fee_that_read_two_hundred_percent() -> None:
+    """iniaku published `"0.02"` and was multiplied by a hundred; then it published
+    `"2"` and the board said 200%. It is read as the percentage it now is."""
+    assert parse_pool_stats(INIAKU, ADAPTERS["iniaku"]).fee_percent == 2.0
 
 
 # -------------------------------------------------------- the height misreading
 
 
-def test_pool_probe_publishes_no_chain_height() -> None:
-    """`currentHeight` must never be surfaced as a height.
+def test_pool_probe_publishes_no_height_under_a_nodes_name() -> None:
+    """A pool's numbers never land in the fields a node's chain tip lives in.
 
-    It is `lastFound` under a misleading name. An earlier version of this module
-    exposed it as `height`, the poller copied it into the field a node's chain tip
-    lives in, and the board marked a healthy nine-miner pool as lagging the tip.
+    An earlier version of this module exposed `currentHeight` as `height`, the poller
+    copied it into the field a node's tip lives in, and the board marked a healthy
+    nine-miner pool as lagging the tip.
     """
     assert "height" not in PoolProbe.model_fields
     assert "tip_lag" not in PoolProbe.model_fields
 
 
-def test_current_height_is_required_but_not_reported() -> None:
-    # Required, because its presence is what distinguishes a real stats payload from
-    # epicmine's catch-all endpoint index...
+def test_current_height_is_required_but_never_a_chain_height() -> None:
+    # Required, because its presence is what tells a stats document from any other
+    # JSON object the host answers with...
     stripped = {
-        "poolInfo": EPICMINE["poolInfo"],
-        "poolStats": {k: v for k, v in EPICMINE["poolStats"].items() if k != "currentHeight"},
-        "poolBlocks": EPICMINE["poolBlocks"],
+        "status": True,
+        "data": {
+            **INIAKU["data"],
+            "poolStats": {
+                k: v for k, v in INIAKU["data"]["poolStats"].items() if k != "currentHeight"
+            },
+        },
     }
-    assert not parse_pool_stats(stripped, ADAPTERS["epicmine"]).ok
+    assert not parse_pool_stats(stripped, ADAPTERS["iniaku"]).ok
 
-    # ...but never reported, so `lastFound` is the only block height in the result.
-    probe = parse_pool_stats(EPICMINE, ADAPTERS["epicmine"])
-    assert probe.last_block_height == EPICMINE["poolBlocks"]["lastFound"]
+    # ...but it is the last block FOUND, so it is not the pool node's tip.
+    probe = parse_pool_stats(INIAKU, ADAPTERS["iniaku"])
+    assert probe.last_block_height == INIAKU["data"]["poolBlocks"]["lastFound"]
+    assert probe.chain_height is None
+
+
+def test_chain_height_comes_only_from_a_documented_chain_height() -> None:
+    probe = parse_pool_stats(EPICPOOL, ADAPTERS["epicpool"])
+    assert probe.chain_height == 3810661
+    # And it is not the last block found, which is 64 blocks earlier.
+    assert probe.last_block_height == 3810597
 
 
 # ------------------------------------------------------------------ the 200 trap
 
 
-def test_epicmine_endpoint_index_is_not_a_healthy_pool() -> None:
-    """A 200 from api.epicmine.io proves nothing.
-
-    Any path returns the endpoint index, so a typo in the adapter path would
-    otherwise read as a working pool with every metric null.
-    """
-    probe = parse_pool_stats(EPICMINE_INDEX, ADAPTERS["epicmine"])
+@pytest.mark.parametrize("name", sorted(ADAPTERS))
+def test_an_endpoint_index_is_not_a_healthy_pool(name: str) -> None:
+    """A 200 proves nothing. A typo in an adapter path would otherwise read as a working
+    pool with every metric null."""
+    probe = parse_pool_stats(ENDPOINT_INDEX, ADAPTERS[name])
     assert not probe.ok
     assert probe.reason is Reason.BAD_RESPONSE
-    assert "poolStats" in (probe.error or "")
+    assert probe.error
 
 
-def test_each_adapter_rejects_the_other_pool_s_payload() -> None:
+def test_each_reader_rejects_the_other_pool_s_payload() -> None:
     """Applying the wrong adapter must fail loudly rather than half-parse."""
-    assert not parse_pool_stats(INIAKU, ADAPTERS["epicmine"]).ok
-    assert not parse_pool_stats(EPICMINE, ADAPTERS["iniaku"]).ok
+    assert not parse_pool_stats(INIAKU, ADAPTERS["epicpool"]).ok
+    assert not parse_pool_stats(EPICPOOL, ADAPTERS["iniaku"]).ok
 
 
-def test_wrapped_adapter_requires_status_true() -> None:
+def test_iniaku_requires_status_true() -> None:
     payload = {"status": False, "data": INIAKU["data"]}
     probe = parse_pool_stats(payload, ADAPTERS["iniaku"])
     assert not probe.ok
     assert "status false" in (probe.error or "")
 
 
+@pytest.mark.parametrize("name", sorted(ADAPTERS))
 @pytest.mark.parametrize(
-    "payload", [None, [], "text", 0, {}, {"data": None}, {"status": True}]
+    "payload",
+    [None, [], "text", 0, {}, {"data": None}, {"status": True}, {"algos": []}, {"algos": {}}],
 )
-def test_garbage_never_raises(payload: Any) -> None:
-    probe = parse_pool_stats(payload, ADAPTERS["iniaku"])
+def test_garbage_never_raises(name: str, payload: Any) -> None:
+    probe = parse_pool_stats(payload, ADAPTERS[name])
     assert not probe.ok
     assert probe.error
+
+
+def test_a_reader_that_trips_is_a_bad_response_not_a_crash() -> None:
+    """The sweep must survive a reader meeting a shape nobody anticipated."""
+
+    def trips(payload: dict[str, Any]) -> PoolProbe:
+        return PoolProbe(ok=True, miners=payload["missing"]["deeper"])
+
+    probe = parse_pool_stats({"a": 1}, PoolAdapter(path="/x", read=trips))
+    assert not probe.ok
+    assert probe.reason is Reason.BAD_RESPONSE
+    assert "KeyError" in (probe.error or "")
+
+
+def test_unreadable_carries_its_message_to_the_row() -> None:
+    def refuses(payload: dict[str, Any]) -> PoolProbe:
+        raise Unreadable("no stats here")
+
+    probe = parse_pool_stats({"a": 1}, PoolAdapter(path="/x", read=refuses))
+    assert probe.error == "no stats here"
 
 
 # ------------------------------------------------------------------- coercion
@@ -240,6 +338,8 @@ def test_garbage_never_raises(payload: Any) -> None:
         # True is an int in Python and would read as the number 1.
         (True, None),
         ([], None),
+        (float("nan"), None),
+        ("inf", None),
     ],
 )
 def test_as_int(raw: Any, expected: int | None) -> None:
@@ -257,35 +357,90 @@ def test_as_float(raw: Any, expected: float | None) -> None:
 def test_quoted_numbers_are_accepted() -> None:
     """These APIs are inconsistent about quoting, and a quoted count is not a fault."""
     payload = {
-        "poolInfo": {"fee": "2.5"},
-        "poolStats": {"activeUsers": "9", "activeWorkers": "25", "currentHeight": "100"},
-        "poolBlocks": {"lastFound": "100", "latest": []},
+        "status": True,
+        "data": {
+            "poolInfo": {"fee": "2.5"},
+            "poolStats": {
+                "activeUsers": "9",
+                "activeWorkers": "25",
+                "currentHeight": "100",
+                "hashrateRandomX": "1500.5",
+            },
+            "poolBlocks": {"lastFound": "100", "latest": []},
+        },
     }
-    probe = parse_pool_stats(payload, ADAPTERS["epicmine"])
+    probe = parse_pool_stats(payload, ADAPTERS["iniaku"])
     assert probe.ok
     assert (probe.miners, probe.workers, probe.last_block_height) == (9, 25, 100)
+    assert probe.hashrate is not None and probe.hashrate.randomx == 1500.5
 
 
 def test_missing_optional_sections_still_parse() -> None:
     """A pool that publishes stats but no block list is degraded data, not an outage."""
     probe = parse_pool_stats(
-        {"poolStats": {"currentHeight": 100}}, ADAPTERS["epicmine"]
+        {"status": True, "data": {"poolStats": {"currentHeight": 100}}}, ADAPTERS["iniaku"]
     )
     assert probe.ok
     assert probe.fee_percent is None
     assert probe.last_block_at is None
     assert probe.last_block_height == 100
+    # No hashrate published is None, not three empty figures and not zero.
+    assert probe.hashrate is None
+    assert probe.payout == []
 
 
-@pytest.mark.parametrize("stamp", [0, -1, 10**18])
-def test_absurd_block_timestamps_become_none(stamp: int) -> None:
-    payload = {
-        "poolStats": {"currentHeight": 100},
-        "poolBlocks": {"lastFound": 100, "latest": [{"time": stamp}]},
-    }
-    probe = parse_pool_stats(payload, ADAPTERS["epicmine"])
+def test_an_algorithm_the_pool_does_not_list_is_none_not_zero() -> None:
+    payload = {**EPICPOOL, "algos": {"randomx": EPICPOOL["algos"]["randomx"]}}
+    probe = parse_pool_stats(payload, ADAPTERS["epicpool"])
     assert probe.ok
-    assert probe.last_block_at is None
+    assert probe.hashrate == PoolHashrate(randomx=653773.6058539139)
+    assert (probe.miners, probe.workers) == (2, 28)
+
+
+@pytest.mark.parametrize("rate", [-1, float("nan"), float("inf"), "x", None, True])
+def test_an_absurd_hashrate_is_dropped(rate: Any) -> None:
+    payload = {
+        "status": True,
+        "data": {"poolStats": {"currentHeight": 100, "hashrateProgPow": rate}},
+    }
+    probe = parse_pool_stats(payload, ADAPTERS["iniaku"])
+    assert probe.ok
+    assert probe.hashrate is None
+
+
+@pytest.mark.parametrize("stamp", [0, -1, 10**18, "soon", "", None, [], True])
+def test_absurd_block_times_become_none(stamp: Any) -> None:
+    assert _when(stamp) is None
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        (1795429645, datetime(2026, 11, 23, 10, 27, 25, tzinfo=UTC)),
+        ("1795429645", datetime(2026, 11, 23, 10, 27, 25, tzinfo=UTC)),
+        ("2026-11-23T08:35:19.9082Z", datetime(2026, 11, 23, 8, 35, 19, 908200, tzinfo=UTC)),
+        # No offset is read as UTC rather than left naive.
+        ("2026-11-23T08:35:19", datetime(2026, 11, 23, 8, 35, 19, tzinfo=UTC)),
+    ],
+)
+def test_block_times_in_either_form(raw: Any, expected: datetime) -> None:
+    assert _when(raw) == expected
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        (["pplns", "solo"], ["PPLNS", "SOLO"]),
+        ("PPLNS", ["PPLNS"]),
+        (["pplns", "PPLNS", " solo "], ["PPLNS", "SOLO"]),
+        (None, []),
+        ([1, None, ""], []),
+        # A free-text field is not a scheme name.
+        (["a" * 40], []),
+    ],
+)
+def test_payout_schemes(raw: Any, expected: list[str]) -> None:
+    assert _payout(raw) == expected
 
 
 # -------------------------------------------------------------------- adapters
@@ -296,6 +451,7 @@ def test_every_adapter_has_a_rooted_path() -> None:
         assert isinstance(adapter, PoolAdapter), name
         assert adapter.path.startswith("/"), name
         assert not adapter.path.endswith("/"), name
+        assert callable(adapter.read), name
 
 
 def test_adapter_names_are_stable_identifiers() -> None:
@@ -306,12 +462,40 @@ def test_adapter_names_are_stable_identifiers() -> None:
         assert name.isidentifier()
 
 
+# ------------------------------------------------------------- hashrate as text
+
+
+@pytest.mark.parametrize(
+    ("value", "text"),
+    [
+        (None, "—"),
+        (0, "0"),
+        (654.2, "654 H/s"),
+        (653773.6, "654 kH/s"),
+        (17133466.3, "17.1 MH/s"),
+        (1012560000, "1.01 GH/s"),
+        (21590502594.6, "21.6 GH/s"),
+        # Rounds up into the next prefix instead of printing 1000 k.
+        (999_600, "1.00 MH/s"),
+        (99_960, "100 kH/s"),
+    ],
+)
+def test_hashrate_is_three_figures_and_a_prefix(value: float | None, text: str) -> None:
+    assert _hashrate(value) == text
+    # Nine characters is what the table's two hashrate columns are sized for.
+    assert len(text) <= 9
+
+
+def test_cuckoo_hashrate_names_its_own_unit() -> None:
+    assert _hashrate(57035.4, "Gps") == "57.0 kGps"
+
+
 # ----------------------------------------------------------------- the verdict
 
 
 def test_a_reachable_pool_is_healthy() -> None:
     state, reason, detail = pool_state(
-        parse_pool_stats(EPICMINE, ADAPTERS["epicmine"]),
+        parse_pool_stats(EPICPOOL, ADAPTERS["epicpool"]),
         consecutive_failures=0,
         thresholds=Thresholds(),
     )
@@ -321,10 +505,10 @@ def test_a_reachable_pool_is_healthy() -> None:
 def test_a_quiet_pool_is_not_penalised() -> None:
     """The regression guard for the whole design.
 
-    iniaku had not found a block for eighteen minutes while epicmine had found one
-    seconds earlier. Both were working. Anything that degrades the first is wrong.
+    epicpool's last block was an hour old while iniaku had found one minutes earlier.
+    Both were working. Anything that degrades the first is wrong.
     """
-    probe = parse_pool_stats(INIAKU, ADAPTERS["iniaku"])
+    probe = parse_pool_stats(EPICPOOL, ADAPTERS["epicpool"])
     state, reason, _ = pool_state(
         probe, consecutive_failures=0, thresholds=Thresholds()
     )

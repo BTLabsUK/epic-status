@@ -137,13 +137,19 @@ thousands of blocks behind.
 
 ### Pools are not nodes
 
-A pool row carries `miners`, `workers`, `fee_percent` and `last_block_height`, and no
-height or `tip_lag`. `last_block_height` is the last block that pool **found** — the
-pools' own `currentHeight` field is the same number despite its name, and none of them
-publishes its node's chain tip.
+Every pool's API is read into one shape: `miners`, `workers`, `hashrate`, `fee_percent`,
+`payout`, `last_block_height`, `last_block_at` and `chain_height`. A field a pool does
+not publish is null. There is no `height` and no `tip_lag` on a pool row.
 
-Do not compare it with `network.tip_height`. A pool finds blocks in proportion to its
-share of the network, so the gap is large for a small pool and near zero for a large
+`hashrate` is an object with one figure per algorithm, `randomx`, `progpow` and
+`cuckoo`, on that algorithm's own turns, in H/s (Cuckoo: graphs/s). There is no total:
+the three are different units of work.
+
+`last_block_height` is the last block that pool **found**. `chain_height` is the tip of
+the pool's own node, and is present only for a pool whose API states it.
+
+Do not compare `last_block_height` with `network.tip_height`. A pool finds blocks in
+proportion to its share of the network, so the gap is large for a small pool and near zero for a large
 one, and it measures pool size rather than pool health. For the same reason no
 threshold is applied to the age of the last block: `green` on a pool row means its API
 answered with valid stats.
@@ -1379,6 +1385,7 @@ def _serialise(
             "fields": {
                 "tip_lag": "blocks behind the highest tip seen; the field to alert on",
                 "last_block_height": "pools only: the last block that pool FOUND, not a chain tip",
+                "hashrate": "pools only: per algorithm, H/s (cuckoo: graphs/s); never a total",
                 "uptime": "fractions, or null where there is no history — never 0",
                 "icon": "square PNG URLs by size, or null: show the host's initials",
             },
@@ -1620,4 +1627,8 @@ def _serialise_target(status: TargetStatus) -> dict[str, Any]:
         # consumer mistakes it for one and compares it to tip_height.
         row["last_block_height"] = status.last_block_height
         row["last_block_at"] = stamp(status.last_block_at)
+        # Added fields only. Per algorithm, never a total: the three are different units.
+        row["hashrate"] = status.hashrate.model_dump() if status.hashrate is not None else None
+        row["payout"] = list(status.payout)
+        row["chain_height"] = status.chain_height
     return row

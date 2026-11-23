@@ -291,33 +291,55 @@ class EpicboxStatus(TargetBase):
     )
 
 
+class PoolHashrate(BaseModel):
+    """One figure per algorithm, on that algorithm's own turns. Never summed: RandomX and
+    ProgPow are hashes per second on different hardware, Cuckoo is graphs per second."""
+
+    randomx: float | None = Field(None, examples=[17133466.3], description="H/s.")
+    progpow: float | None = Field(None, examples=[21590502594.6], description="H/s.")
+    cuckoo: float | None = Field(None, examples=[57035.4], description="Graphs/s.")
+
+
 class PoolStatus(TargetBase):
     miners: int | None = Field(None, examples=[118], description="Connected accounts.")
     workers: int | None = Field(
         None, examples=[521], description="Connected rigs, which exceeds `miners`."
     )
+    hashrate: PoolHashrate | None = Field(
+        None, description="Null when the pool's API publishes no hashrate."
+    )
     fee_percent: float | None = Field(
         None,
         examples=[2.5],
-        description=(
-            "Always a percentage. One pool publishes its fee as the fraction "
-            "`\"0.02\"`; that is normalised here so the two are comparable."
-        ),
+        description="Always a percentage, whatever unit the pool publishes its fee in.",
+    )
+    payout: list[str] = Field(
+        default_factory=list,
+        examples=[["PPLNS", "SOLO"]],
+        description="Payout schemes the pool names, upper-cased. Empty when it names none.",
     )
     last_block_height: int | None = Field(
         None,
         examples=[3721267],
         description=(
-            "The last block this pool **found** — not its chain tip, which no pool "
-            "API exposes. Do not compare it with `network.tip_height`: the expected "
-            "gap is inversely proportional to the pool's share, so a small pool is "
-            "legitimately hundreds of blocks back while working perfectly."
+            "The last block this pool **found**, not its chain tip. Do not compare it "
+            "with `network.tip_height`: the expected gap is inversely proportional to "
+            "the pool's share, so a small pool is legitimately hundreds of blocks back "
+            "while working perfectly."
         ),
     )
     last_block_at: str | None = Field(
         None,
         examples=["2026-09-22T07:52:15Z"],
         description="When that block was found. The useful form of the field above.",
+    )
+    chain_height: int | None = Field(
+        None,
+        examples=[3810661],
+        description=(
+            "The tip of the pool's own node, for a pool whose API states it. Null for the "
+            "others. This is the pool field that is comparable with `network.tip_height`."
+        ),
     )
 
 
@@ -568,7 +590,7 @@ class PoolList(BaseModel):
     meta: ListMeta
     generated_at: str
     pools: list[str] = Field(
-        default_factory=list, examples=[["epicmine.io", "epic.iniaku.my.id"]]
+        default_factory=list, examples=[["epicpool.io", "epic.iniaku.my.id"]]
     )
 
 

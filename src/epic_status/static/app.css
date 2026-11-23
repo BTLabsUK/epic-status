@@ -1569,6 +1569,20 @@ pre {
       5.5rem;               /* state */
   }
 
+  /* The pool table divides the same four metric tracks differently: a miner count is
+     narrower than a block height, and a hashrate ("17.1 MH/s", nine characters at most) is
+     wider than a version. The four still add up to 21.75rem, so Location and every column
+     after it stay on the same lines as in the other two tables. */
+  .group-pool .rows {
+    grid-template-columns:
+      auto minmax(16.5rem, 0.25fr)
+      3.75rem               /* miners */
+      7.25rem               /* last block */
+      5.375rem              /* RandomX hashrate */
+      5.375rem              /* ProgPow hashrate */
+      5rem 9.5rem 4rem minmax(4rem, 1.4fr) 5.5rem;
+  }
+
   @supports (grid-template-columns: subgrid) {
     .row,
     .row-head {
@@ -1654,6 +1668,13 @@ pre {
         'dot host m1 m2 m3 m4 where lat up spark state'
         '.   why  why why why why why why why why why'
         'det det  det det det det det det det det det';
+    }
+
+    .group-pool .row,
+    .group-pool .row-head {
+      grid-template-columns:
+        auto minmax(16.5rem, 0.25fr) 3.75rem 7.25rem 5.375rem 5.375rem 5rem 9.5rem 4rem
+        minmax(4rem, 1.4fr) 5.5rem;
     }
 
     .row-meta > .m-where {
@@ -4621,10 +4642,13 @@ input[data-state='failed'] {
 
   /* Out of the row and into its panel: the location (the panel names the country, the
      city and the network), the node's height (the hero gives the tip, and "vs tip" says
-     how far off this node is), and the empty slot that keeps Version aligned in the
-     table and has no column to keep open here. */
+     how far off this node is), a pool's two hashrates (four cells is the readout, and
+     the panel carries all three algorithms), and the empty slot that keeps Version
+     aligned in the table and has no column to keep open here. */
   .row-meta > .m-where,
-  .group-node .row-meta > .m1 {
+  .group-node .row-meta > .m1,
+  .group-pool .row-meta > .m3,
+  .group-pool .row-meta > .m4 {
     display: none;
   }
 
@@ -4762,11 +4786,24 @@ input[data-state='failed'] {
       1rem 5.5rem;
   }
 
+  .group-pool .rows {
+    grid-template-columns:
+      auto minmax(9rem, 1fr) 3.75rem 7.25rem 5.375rem 5.375rem 1rem 5.5rem 4rem
+      1rem 5.5rem;
+  }
+
   @supports not (grid-template-columns: subgrid) {
     .row,
     .row-head {
       grid-template-columns:
         auto minmax(9rem, 1fr) 6.5rem 7.25rem 4rem 4rem 1rem 5.5rem 4rem
+        1rem 5.5rem;
+    }
+
+    .group-pool .row,
+    .group-pool .row-head {
+      grid-template-columns:
+        auto minmax(9rem, 1fr) 3.75rem 7.25rem 5.375rem 5.375rem 1rem 5.5rem 4rem
         1rem 5.5rem;
     }
   }

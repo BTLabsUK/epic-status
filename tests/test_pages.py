@@ -22,6 +22,7 @@ from epic_status.models import (
     Check,
     Kind,
     NetworkSummary,
+    PoolHashrate,
     Snapshot,
     Source,
     State,
@@ -78,7 +79,13 @@ def status(kind: Kind, slug: str) -> TargetStatus:
         s.cert_expires_in_days = 40
     else:
         s.miners = 9
+        s.workers = 25
+        s.hashrate = PoolHashrate(randomx=17133466.3, progpow=21590502594.6, cuckoo=57035.4)
+        s.fee_percent = 2.0
+        s.payout = ["PPLNS", "SOLO"]
+        s.last_block_height = 3_720_990
         s.last_block_at = datetime.now(UTC)
+        s.chain_height = 3_721_000
     return s
 
 
@@ -263,17 +270,48 @@ def test_every_header_cell_after_the_host_carries_an_alignment_class(
         assert 'class="h-' in cell, f"{group}: unclassed header cell {cell[:60]}"
 
 
-def test_pools_have_no_version_header(snapshot: Snapshot) -> None:
-    """A pool reports no version of its own, so labelling the column made it read as
-    missing data. The track stays — Version is column 5 in all three tables — but the
-    label goes, and with it the sort button that could not have sorted anything."""
+def test_pools_show_hashrate_where_a_node_shows_version_and_peers(
+    snapshot: Snapshot,
+) -> None:
+    """A pool reports no version of its own. Its two slots hold hashrate by algorithm,
+    under the algorithm's name, and both sort."""
     html = render_board(snapshot=snapshot, settings=SETTINGS)
     pool_head = "".join(_header_cells(html, "group-pool"))
     assert "Version" not in pool_head
-    assert '<span class="h-m3"></span>' in pool_head
-    # The column itself is still there, in both the header and the rows.
-    assert "h-m3" in pool_head
-    assert "m3 m-empty" in html
+    assert 'data-sort-key="m3">RandomX<' in pool_head
+    assert 'data-sort-key="m4">ProgPow<' in pool_head
+    row = html[html.index('id="row-pool.example"') :]
+    assert 'data-field="hash-randomx"' in row and "17.1 MH/s" in row
+    assert 'data-field="hash-progpow"' in row and "21.6 GH/s" in row
+    # Sorted on the number, not on the text.
+    assert 'data-sort="17133466.3"' in row
+    # No total anywhere: the algorithms are different units.
+    assert "total hashrate" not in html.lower()
+
+
+def test_a_pool_panel_carries_what_the_row_has_no_room_for(snapshot: Snapshot) -> None:
+    html = render_board(snapshot=snapshot, settings=SETTINGS)
+    panel = html[html.index('id="d-pool.example"') :]
+    panel = panel[: panel.index("</dl>")]
+    for label, value in [
+        ("Cuckoo", "57.0 kGps"),
+        ("workers", "25"),
+        ("fee", "2.00%"),
+        ("payout", "PPLNS, SOLO"),
+        ("last block", "3,720,990"),
+        ("chain height", "3,721,000"),
+    ]:
+        assert f"<dt>{label}</dt>" in panel, label
+        assert value in panel, label
+
+
+def test_a_pool_that_publishes_no_hashrate_shows_a_dash(snapshot: Snapshot) -> None:
+    snapshot.pools[0].hashrate = None
+    html = render_board(snapshot=snapshot, settings=SETTINGS)
+    cell = html[html.index('data-field="hash-randomx"') :]
+    cell = cell[: cell.index("</span>")]
+    assert 'data-sort="-1"' in cell and "—" in cell
+    assert "<dt>Cuckoo</dt>" not in html
 
 
 def test_nodes_and_relays_do_have_a_version_header(snapshot: Snapshot) -> None:

@@ -255,26 +255,50 @@ class RelayHealth(BaseModel):
         return None
 
 
+class PoolHashrate(BaseModel):
+    """A pool's hashrate, one figure per algorithm.
+
+    Epic finds each block with one of three algorithms, and their units are not the
+    same work: RandomX and ProgPow are hashes per second on different hardware, Cuckoo
+    is graphs per second. There is no total, because adding them adds unlike things and
+    the sum is the ProgPow figure with noise on it.
+    """
+
+    randomx: float | None = None
+    progpow: float | None = None
+    cuckoo: float | None = None
+
+    @property
+    def is_empty(self) -> bool:
+        return self.randomx is None and self.progpow is None and self.cuckoo is None
+
+
 class PoolProbe(BaseModel):
-    """Result of one GET against one pool's stats API.
+    """Result of one GET against one pool's stats API, in the one shape every pool is
+    read into. `probes.pool` fills it; nothing downstream knows which API it came from.
 
-    Deliberately thin. A pool's hashrate is a big, constantly-moving number that
-    says nothing about whether the pool is working, so it is not collected.
+    A field a pool does not publish is None, never a guess.
 
-    `last_block_height` is the last block the pool FOUND, not its chain tip — the
-    APIs' `currentHeight` is the same number, despite the name. It must not be
-    compared against the fleet tip; see the note in probes.pool.
+    `last_block_height` is the last block the pool FOUND, not its chain tip. It must not
+    be compared against the fleet tip; see the note in probes.pool. `chain_height` is
+    the other number, the tip of the pool's own node, and is set only for an API that
+    states it as such.
 
     `fee_percent` is always a percentage, whatever unit the pool reported it in.
+    `hashrate` is on the algorithm's own turns, in H/s (Cuckoo: graphs/s). `payout` is
+    the payout schemes the pool names, upper-cased: `PPLNS`, `SOLO`.
     """
 
     ok: bool
     latency_ms: int | None = None
     miners: int | None = None
     workers: int | None = None
+    hashrate: PoolHashrate | None = None
     fee_percent: float | None = None
+    payout: list[str] = Field(default_factory=list)
     last_block_height: int | None = None
     last_block_at: datetime | None = None
+    chain_height: int | None = None
     http_status: int | None = None
     reason: Reason = Reason.OK
     error: str | None = None
@@ -761,9 +785,14 @@ class TargetStatus(BaseModel):
     # that every consumer has to narrow before reading a latency.
     miners: int | None = None
     workers: int | None = None
+    hashrate: PoolHashrate | None = None
     fee_percent: float | None = None
+    payout: list[str] = Field(default_factory=list)
     last_block_height: int | None = None
     last_block_at: datetime | None = None
+    chain_height: int | None = None
+    """Pools only: the tip of the pool's own node, where its API states one. Kept apart
+    from `height`, which is a node row's and is compared against the fleet tip."""
 
     last_checked_at: datetime | None = None
     last_ok_at: datetime | None = None

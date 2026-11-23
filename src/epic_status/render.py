@@ -138,6 +138,7 @@ def _environment() -> Environment:
     env.globals["server_initials"] = server_initials
     env.globals["server_tint"] = server_tint
     env.filters["ms"] = _ms
+    env.filters["hashrate"] = _hashrate
     env.filters["pct"] = _pct
     env.filters["relative"] = _relative
     env.filters["epoch_ms"] = _epoch_ms
@@ -167,6 +168,29 @@ def _environment() -> Environment:
 
 def _thousands(value: int | None) -> str:
     return f"{value:,}" if isinstance(value, int) else "—"
+
+
+_SI_PREFIXES = ((1e12, "T"), (1e9, "G"), (1e6, "M"), (1e3, "k"), (1.0, ""))
+
+
+def _hashrate(value: float | None, unit: str = "H/s") -> str:
+    """Three significant figures and an SI prefix: `17.1 MH/s`, `654 kH/s`.
+
+    Never more than nine characters with the default unit, which is what the two
+    hashrate columns of the pool table are sized for. `app.js` has the same function
+    (`fmtHash`); the two must agree, or a row changes its text on the first poll.
+    """
+    if value is None:
+        return "—"
+    if value <= 0:
+        return "0"
+    for scale, prefix in _SI_PREFIXES:
+        # 0.9995 so that 999,600 is 1.00 M and not 1000 k.
+        if value >= scale * 0.9995 or scale == 1.0:
+            scaled = value / scale
+            digits = 0 if scaled >= 99.95 else 1 if scaled >= 9.995 else 2
+            return f"{scaled:.{digits}f} {prefix}{unit}"
+    return "—"
 
 
 def _ms(value: int | None) -> str:
@@ -1062,7 +1086,7 @@ def render_api(*, settings: Settings) -> str:
                 "{\n"
                 '  "meta": { "describes": "Mining pools whose stats API answered", ... },\n'
                 '  "generated_at": "2026-09-22T18:10:14Z",\n'
-                '  "pools": ["epicmine.io", ...]\n'
+                '  "pools": ["epicpool.io", ...]\n'
                 "}"
             ),
         },

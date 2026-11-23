@@ -1082,9 +1082,14 @@ class Poller:
             # make the board's "vs tip" column a lie for these rows.
             miners=probe.miners,
             workers=probe.workers,
+            hashrate=probe.hashrate,
             fee_percent=probe.fee_percent,
+            payout=probe.payout,
             last_block_height=probe.last_block_height,
             last_block_at=probe.last_block_at,
+            # The pool node's own tip, in a field of its own: never `height`, which the
+            # board compares against the fleet tip.
+            chain_height=probe.chain_height,
             last_checked_at=datetime.now(UTC),
             last_ok_at=datetime.now(UTC) if probe.ok else parse_iso(row["last_ok_at"]),
             last_error=None if probe.ok else (probe.error or row["last_error"]),

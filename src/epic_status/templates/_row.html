@@ -180,10 +180,20 @@
           data-sort="{{ status.last_block_at | epoch_ms or 0 }}">
       <em>last block</em><span data-age="{{ status.last_block_at | epoch_ms }}">{% if status.last_block_at %}{{ status.last_block_at | relative }}{% else %}—{% endif %}</span>
     </span>
-    {# A pool reports no version of its own. The slot stays, so Version is the same column
-       in every table. #}
-    <span class="m m3 m-empty" aria-hidden="true"></span>
-    <span class="m m4 m-empty" aria-hidden="true"></span>
+    {#
+      Hashrate, for the two algorithms that find 96% of blocks. Two cells and no total: the
+      units are not the same work, and a sum is the ProgPow figure with noise on it. Cuckoo
+      is in the row's panel. A pool whose API publishes no hashrate renders an em dash.
+    #}
+    {% set rate = status.hashrate %}
+    <span class="m m3" data-field="hash-randomx" data-slug="{{ t.slug }}"
+          data-sort="{{ rate.randomx if rate and rate.randomx is not none else -1 }}">
+      <em>RandomX</em>{{ (rate.randomx if rate else none) | hashrate }}
+    </span>
+    <span class="m m4" data-field="hash-progpow" data-slug="{{ t.slug }}"
+          data-sort="{{ rate.progpow if rate and rate.progpow is not none else -1 }}">
+      <em>ProgPow</em>{{ (rate.progpow if rate else none) | hashrate }}
+    </span>
 
     {% else %}
     {#
@@ -444,6 +454,31 @@
       </div>
       {% endif %}
 
+      {#
+        Hashrate per algorithm. RandomX and ProgPow are columns of the table, so here they
+        are `d-narrow`: shown where the row has no room for them. Cuckoo is only here.
+      #}
+      {% if status.hashrate %}
+      {% if status.hashrate.randomx is not none %}
+      <div class="d-narrow">
+        <dt>RandomX</dt>
+        <dd>{{ status.hashrate.randomx | hashrate }}</dd>
+      </div>
+      {% endif %}
+      {% if status.hashrate.progpow is not none %}
+      <div class="d-narrow">
+        <dt>ProgPow</dt>
+        <dd>{{ status.hashrate.progpow | hashrate }}</dd>
+      </div>
+      {% endif %}
+      {% if status.hashrate.cuckoo is not none %}
+      <div>
+        <dt>Cuckoo</dt>
+        <dd>{{ status.hashrate.cuckoo | hashrate('Gps') }}</dd>
+      </div>
+      {% endif %}
+      {% endif %}
+
       {% if status.fee_percent is not none %}
       <div>
         <dt>fee</dt>
@@ -451,10 +486,26 @@
       </div>
       {% endif %}
 
+      {% if status.payout %}
+      <div>
+        <dt>payout</dt>
+        <dd>{{ status.payout | join(', ') }}</dd>
+      </div>
+      {% endif %}
+
       {% if status.last_block_height is not none %}
       <div>
         <dt>last block</dt>
         <dd>{{ status.last_block_height | thousands }}</dd>
+      </div>
+      {% endif %}
+
+      {# The pool's own node, where its API states the height. Beside the last block found
+         on purpose: they are different numbers and read as one when only one is shown. #}
+      {% if status.chain_height is not none %}
+      <div>
+        <dt>chain height</dt>
+        <dd>{{ status.chain_height | thousands }}</dd>
       </div>
       {% endif %}
 
@@ -704,13 +755,11 @@
   {{ th('m1', 'Miners', 'h-m1') }}
   {{ th('m2', 'Last block', 'h-m2') }}
   {#
-    No Version header for a pool. A pool reports no version of its own, so the label named
-    a column that was empty on every row — which reads as missing data rather than as
-    not-applicable. The *track* stays, unlabelled, so Version is still column 5 in all
-    three tables and every column after it lines up across them.
+    Hashrate by algorithm in the two slots a node uses for version and peers. The header
+    is the algorithm's name alone: the unit is in every value.
   #}
-  <span class="h-m3"></span>
-  <span class="h-m4"></span>
+  {{ th('m3', 'RandomX', 'h-m3') }}
+  {{ th('m4', 'ProgPow', 'h-m4') }}
   {% else %}
   {{ th('m1', 'TLS expires', 'h-m1') }}
   <span class="h-m2"></span>

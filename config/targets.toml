@@ -213,30 +213,20 @@ notes = "Same relay as epicbox.btlabs.uk, for mainnet and floonet wallets"
 # ---------------------------------------------------------------------- pools
 #
 # Pools have no protocol. Each one exposes a hand-rolled JSON stats endpoint, so
-# each needs a named `adapter` implemented in src/epic_status/probes/pool.py, and
-# adding one is a code change rather than a config change. That is the intended
-# friction: the alternative is guessing at a third party's response shape and
-# silently reporting nonsense when it changes.
+# each needs a named `adapter`: a reader in src/epic_status/probes/pool.py that
+# turns that pool's JSON into the one shape every pool is shown in. Adding a pool
+# is a reader plus an entry here, and the steps are at the top of that file. That
+# is the intended friction: the alternative is guessing at a third party's
+# response shape and silently reporting nonsense when it changes.
 #
-# `endpoint` is the base of the API, which is not always the public host —
-# epicmine serves its site on epicmine.io and its API on api.epicmine.io. The
-# adapter supplies the path.
+# `endpoint` is the base of the API, which is not always the public host: a pool
+# can serve its site on one hostname and its API on another. The adapter supplies
+# the path.
 #
-# Only reachability, chain height, miner and worker counts, the fee and the last
-# block found are collected. Not hashrate: it is a large fast-moving number that
-# says nothing about whether a pool is working, and on a status board it would be
-# read as a ranking.
-
-[[pool]]
-slug = "epicmine.io"
-display_host = "epicmine.io"
-endpoint = "https://api.epicmine.io"
-adapter = "epicmine"
-operator = "EpicMine"
-# Stats answered in ~2.8 s, which is why pools are polled at 30 s and not 5 s.
-# Regional stratum hosts in Germany, the United States and Singapore; the API
-# itself is one origin, so the latency below describes that origin only.
-notes = "Stratum in DE, US and SG. Fee 2.5%"
+# Collected: reachability, miner and worker counts, hashrate per algorithm, the
+# fee, the payout schemes, the last block found and, where the API states it, the
+# height of the pool's own node. A stats route can be slow (one ran 2.8 s on the
+# median), which is why pools are polled at 30 s and not 5 s.
 
 [[pool]]
 slug = "epic.iniaku.my.id"
@@ -244,6 +234,27 @@ display_host = "epic.iniaku.my.id"
 endpoint = "https://epic.iniaku.my.id"
 adapter = "iniaku"
 operator = "IniAku"
-# Answered in ~450 ms. Reports its fee as the string "0.02" rather than a
-# percentage, which the adapter converts — see fee_is_fraction in probes/pool.py.
+# Answered in ~450 ms. Reports its fee as the string "2", in percent; until
+# November 2026 it was the fraction "0.02".
 notes = "Fee 2%"
+
+[[pool]]
+slug = "epicpool.io"
+display_host = "epicpool.io"
+endpoint = "https://epicpool.io"
+adapter = "epicpool"
+operator = "Epic Pool"
+# 2026-11-23. A documented public API (/api/v1, OpenAPI at /api/v1/openapi.json),
+# limited to 120 requests a minute per address; this service sends two. The
+# summary answered in ~300 ms.
+#
+# The site is in Russian by default, and the servers are in the Netherlands: the
+# pool's own /pool/locations names Netherlands for both stratum hosts, and the
+# address the site and eu1 share is registered there. The country here is where
+# the server is, as on every other row.
+country = "NL"
+notes = "Stratum in the Netherlands. Fee 2.5%"
+
+# epicmine.io was listed here and has been removed. Its API still answers, with no
+# miners connected and no block found since 2026-11-13. History is kept; removing
+# a seed disables the row rather than deleting it.
