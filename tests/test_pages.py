@@ -293,8 +293,9 @@ def test_a_pool_panel_carries_what_the_row_has_no_room_for(snapshot: Snapshot) -
     html = render_board(snapshot=snapshot, settings=SETTINGS)
     panel = html[html.index('id="d-pool.example"') :]
     panel = panel[: panel.index("</dl>")]
+    # Cuckoo is read and is in status.json; the page shows the two algorithms of the table.
+    assert "Cuckoo" not in html
     for label, value in [
-        ("Cuckoo", "57.0 kGps"),
         ("workers", "25"),
         ("fee", "2.00%"),
         ("payout", "PPLNS, SOLO"),

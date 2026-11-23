@@ -183,7 +183,7 @@
     {#
       Hashrate, for the two algorithms that find 96% of blocks. Two cells and no total: the
       units are not the same work, and a sum is the ProgPow figure with noise on it. Cuckoo
-      is in the row's panel. A pool whose API publishes no hashrate renders an em dash.
+      is not shown. A pool whose API publishes no hashrate renders an em dash.
     #}
     {% set rate = status.hashrate %}
     <span class="m m3" data-field="hash-randomx" data-slug="{{ t.slug }}"
@@ -455,8 +455,9 @@
       {% endif %}
 
       {#
-        Hashrate per algorithm. RandomX and ProgPow are columns of the table, so here they
-        are `d-narrow`: shown where the row has no room for them. Cuckoo is only here.
+        Hashrate for the two algorithms the table shows. They are columns there, so here
+        they are `d-narrow`: shown where the row has no room for them. Cuckoo is read and
+        is in status.json, and is not on the page.
       #}
       {% if status.hashrate %}
       {% if status.hashrate.randomx is not none %}
@@ -469,12 +470,6 @@
       <div class="d-narrow">
         <dt>ProgPow</dt>
         <dd>{{ status.hashrate.progpow | hashrate }}</dd>
-      </div>
-      {% endif %}
-      {% if status.hashrate.cuckoo is not none %}
-      <div>
-        <dt>Cuckoo</dt>
-        <dd>{{ status.hashrate.cuckoo | hashrate('Gps') }}</dd>
       </div>
       {% endif %}
       {% endif %}

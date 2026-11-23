@@ -75,8 +75,9 @@ open. A board with no Epicmail relay shows the classic part open, as the whole t
 read into one shape, so the row is the same whichever pool it is. Hashrate is two columns,
 RandomX and ProgPow, in the slots a node uses for version and peers; there is no total,
 because the algorithms are different units of work and their sum is the ProgPow figure.
-Cuckoo, workers, the fee, the payout schemes, the height of the last block found and,
-where the pool states it, the height of its own node are in the row's panel. The pool
+Cuckoo is not on the page; it is in status.json. Workers, the fee, the payout schemes,
+the height of the last block found and, where the pool states it, the height of its own
+node are in the row's panel. The pool
 table divides the four metric tracks to suit these values and keeps their combined width,
 so Location and every column after it line up with the other two tables. On a phone the
 row keeps four cells and the panel carries the hashrate.
